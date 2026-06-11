@@ -1,0 +1,71 @@
+import pygame
+
+from configs.settings import (
+    WORLD_WIDTH,
+    WORLD_HEIGHT,
+    BG_COLOR,
+    FOOD_COLOR,
+)
+
+class Renderer:
+
+    def __init__(self):
+
+        pygame.init()
+
+        self.screen = pygame.display.set_mode(
+            (WORLD_WIDTH, WORLD_HEIGHT)
+        )
+
+        pygame.display.set_caption(
+            "Artificial Evolution Laboratory"
+        )
+
+    def draw_food(self, food_list):
+
+        for food in food_list:
+
+            pygame.draw.circle(
+                self.screen,
+                FOOD_COLOR,
+                (int(food[0]), int(food[1])),
+                3
+            )
+
+    def draw_organisms(self, organisms):
+
+     for organism in organisms:
+
+        x = int(organism.x)
+        y = int(organism.y)
+
+        # Genome traits
+        speed = organism.genome["speed"]
+        vision = organism.genome["vision_radius"]
+        metabolism = organism.genome["metabolism"]
+
+        # Convert traits into RGB
+        r = min(255, int(speed * 40))
+
+        g = min(255, int(vision * 2))
+
+        b = min(255, int((2 - metabolism) * 120))
+
+        color = (r, g, b)
+
+        pygame.draw.circle(
+            self.screen,
+            color,
+            (x, y),
+            max(3, int(organism.genome["size"] * 0.7))
+        )
+
+    def draw(self, organisms, food, tick):
+
+        self.screen.fill(BG_COLOR)
+
+        self.draw_food(food)
+
+        self.draw_organisms(organisms)
+
+        pygame.display.flip()
