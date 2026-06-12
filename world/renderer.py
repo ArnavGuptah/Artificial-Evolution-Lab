@@ -60,7 +60,7 @@ class Renderer:
             max(3, int(organism.genome["size"] * 0.7))
         )
 
-    def draw(self, organisms, food, tick):
+    def draw(self, organisms, predators, food, tick):
 
         self.screen.fill(BG_COLOR)
 
@@ -68,4 +68,17 @@ class Renderer:
 
         self.draw_organisms(organisms)
 
+        self.draw_predators(predators)
+
         pygame.display.flip()
+
+    def draw_predators(self, predators):
+
+        for predator in predators:
+
+            pygame.draw.circle(
+                self.screen,
+                (255, 0, 0),
+                (int(predator.x), int(predator.y)),
+                8
+            )
