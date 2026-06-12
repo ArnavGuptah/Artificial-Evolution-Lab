@@ -78,7 +78,7 @@ class Renderer:
 
             pygame.draw.circle(
                 self.screen,
-                (255, 0, 0),
+                (255, 255, 255),
                 (int(predator.x), int(predator.y)),
                 8
             )
