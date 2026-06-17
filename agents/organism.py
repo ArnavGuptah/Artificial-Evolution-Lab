@@ -1,5 +1,6 @@
 import random
 import math
+from core.agent import Agent
 
 from configs.settings import (
     WORLD_WIDTH,
@@ -18,7 +19,7 @@ from agents.genome import random_genome
 from evolution.mutation import gaussian_mutate
 
 
-class Organism:
+class Organism(Agent):
 
     def __init__(self, x, y, genome=None):
 
@@ -161,7 +162,7 @@ class Organism:
 
           self.move()
 
-          self.eat(food_list)
+          #self.eat(food_list)
 
           self.age += 1
 

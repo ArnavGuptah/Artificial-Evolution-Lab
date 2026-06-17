@@ -1,5 +1,6 @@
 import random
 import math
+from core.agent import Agent
 
 from configs.settings import (
     WORLD_WIDTH,
@@ -15,7 +16,7 @@ from configs.settings import (
 )
 
 
-class Predator:
+class Predator(Agent):
 
     def __init__(self, x, y):
 

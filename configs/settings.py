@@ -1,6 +1,6 @@
 # ── World ──────────────────────────────────────────────────────────────────────
-WORLD_WIDTH          = 1200
-WORLD_HEIGHT         = 900
+WORLD_WIDTH          = 1100
+WORLD_HEIGHT         = 800
 FPS                  = 30
 BG_COLOR             = (12, 12, 22)
 
