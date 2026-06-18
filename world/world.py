@@ -1,7 +1,9 @@
 import random
 import pygame
+import pygame.font
 from core.environment import Environment
 from domains.ecology.rules.eat_rule import EatRule
+from domains.ecology.rules.move_rule import MoveRule
 
 from configs.settings import (
     WORLD_WIDTH,
@@ -25,11 +27,14 @@ from agents.predator import Predator
 class World(Environment):
 
     def __init__(self):
+        
         super().__init__()
 
-        self.rules = []
-
-        self.rules.append(EatRule())
+        self.paused = False
+        self.rules = [
+            EatRule(),
+            MoveRule()
+                ]
 
         self.organisms = []
 
@@ -42,6 +47,7 @@ class World(Environment):
         self.speed_history = []
 
         self.renderer = Renderer()
+        self.selected_organism = None
 
         # Spawn organisms
         for _ in range(INITIAL_ORGANISMS):
@@ -134,15 +140,23 @@ class World(Environment):
 
         new_organisms = []
         child = None
-
+        
         for organism in self.organisms:
 
-          child = organism.update(
-             self.food,
-             self.organisms
-          )
+            organism.update_drives(
 
-          if child and len(self.organisms) < MAX_ORGANISMS:
+                self.predators
+
+            )
+
+
+            child = organism.update(self.food, self.organisms)
+
+            if (child and len(self.organisms) < MAX_ORGANISMS):
+
+                new_organisms.append(child)
+
+        if child and len(self.organisms) < MAX_ORGANISMS:
            new_organisms.append(child)
 
         self.organisms.extend(new_organisms)
@@ -201,16 +215,49 @@ class World(Environment):
 
             for event in pygame.event.get():
 
-                if event.type == pygame.QUIT:
+                if event.type == pygame.KEYDOWN:
+
+                    if event.key == pygame.K_SPACE:
+
+                        self.paused = not self.paused
+
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+
+                    if event.button == 1:
+
+                        mx, my = pygame.mouse.get_pos()
+
+                        self.selected_organism = None
+
+
+                        for organism in self.organisms:
+
+                            dx = organism.x - mx
+
+                            dy = organism.y - my
+
+                            distance = (dx*dx + dy*dy)**0.5
+
+
+                            if distance < 10:
+
+                                self.selected_organism = organism
+
+                                break
+
+                elif event.type == pygame.QUIT:
                     running = False
 
-            self.update()
+            if not self.paused:
+
+                self.update()
 
             self.renderer.draw(
                 self.organisms,
                 self.predators,
                 self.food,
-                self.tick
+                self.tick,
+                self.selected_organism
             )
 
             clock.tick(FPS)

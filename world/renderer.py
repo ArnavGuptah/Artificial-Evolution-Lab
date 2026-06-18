@@ -1,5 +1,7 @@
+from matplotlib import lines
 import pygame
 
+from agents import organism
 from configs.settings import (
     WORLD_WIDTH,
     WORLD_HEIGHT,
@@ -12,6 +14,7 @@ class Renderer:
     def __init__(self):
 
         pygame.init()
+        self.font = pygame.font.SysFont("consolas",18)
 
         self.screen = pygame.display.set_mode(
             (WORLD_WIDTH, WORLD_HEIGHT)
@@ -77,7 +80,7 @@ class Renderer:
             max(3, int(organism.genome["size"] * 0.7))
         )
 
-    def draw(self, organisms, predators, food, tick):
+    def draw(self, organisms, predators, food, tick, selected_organism):
 
         self.screen.fill(BG_COLOR)
 
@@ -86,6 +89,12 @@ class Renderer:
         self.draw_organisms(organisms)
 
         self.draw_predators(predators)
+
+        self.draw_info_panel(
+
+            selected_organism
+
+        )
 
         pygame.display.flip()
 
@@ -116,7 +125,9 @@ class Renderer:
 
             f"Metabolism: {organism.genome['metabolism']:.2f}",
 
-            f"Size: {organism.genome['size']:.2f}"
+            f"Size: {organism.genome['size']:.2f}",
+
+            f"Goal : {organism.current_goal}"
 
         ]
 
@@ -149,3 +160,88 @@ class Renderer:
             )
 
             y_offset += 20
+
+    def draw_info_panel(self,organism):
+
+        if organism is None:
+
+            return
+
+
+        lines = [
+
+        f"Age : {organism.age}",
+
+        f"Energy : {organism.energy:.1f}",
+
+        f"Speed : {organism.genome['speed']:.2f}",
+
+        f"Vision : {organism.genome['vision_radius']:.2f}",
+
+        f"Metabolism : {organism.genome['metabolism']:.2f}",
+
+        f"Size : {organism.genome['size']:.2f}"
+
+        ]
+
+        lines.append("")
+
+        lines.append("Drives")
+
+
+        for drive,value in (
+
+            organism.drives.items()
+
+        ):
+
+            lines.append(
+
+                f"{drive}: "
+
+                f"{value:.2f}"
+
+            )
+
+        lines.append("Recent Events")
+        for age,event in (
+
+            organism.life_events[-3:]
+
+        ):
+
+            lines.append(
+
+                f"{age}: {event}"
+
+            )
+
+
+        remembered_food = (
+
+            organism.memory.recall(
+
+                "food_position"
+
+            )
+
+        )
+
+
+        lines.append(
+
+            f"Memory : {remembered_food}"
+
+        )
+
+
+        y = 20
+
+
+        for line in lines:
+
+            surface = self.font.render(line,True,(255,255,255))
+
+        self.screen.blit(surface,(20,y))
+
+        y += 25

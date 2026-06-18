@@ -3,6 +3,8 @@ import math
 from core.agent import Agent
 from core.action import Action
 from core.action_type import ActionType
+from Brains.hardcoded_brain import HardcodedBrain
+from core.memory import Memory
 
 from configs.settings import (
     WORLD_WIDTH,
@@ -26,6 +28,36 @@ class Organism(Agent):
     def __init__(self, x, y, genome=None):
 
         super().__init__()
+
+        self.life_events = []
+        self.brain = HardcodedBrain()
+        self.memory = Memory()
+
+        self.current_goal = "IDLE"
+
+        self.drives = {
+
+            "hunger": 0.5,
+            "fear": 0.0,
+            "curiosity": 0.5,
+            "reproduction": 0.0
+        }
+
+        self.emotions = {
+
+            "hunger": 0,
+            "fear": 0,
+            "curiosity": 0.5
+        }
+
+
+        self.self_beliefs = {
+
+            "I am fast": 0,
+            "I am hungry": 0,
+            "I am weak": 0
+        }
+
         self.x = x
         self.y = y
 
@@ -171,109 +203,83 @@ class Organism(Agent):
 
           return self.reproduce(organisms)
     
-    def decide(self, environment):
+    def decide(self,environment):
 
-        observation = self.perceive(environment)
+        observation = (
 
-        if (
+            self.brain.perceive(self,environment)
 
-            observation["energy"] < 100
+        )
 
-            and
+        return (
 
-            observation["food_distance"] < 100
+            self.brain.decide(self, observation)
 
-        ):
+        )
+    
+    def add_event( self, text):
 
-            return Action(
+        self.life_events.append(
 
-                ActionType.EAT
+            (
 
-            )
+            self.age,
 
-        elif (
-
-            observation["energy"]
-
-            >
-
-            REPRODUCTION_THRESH
-
-        ):
-
-            return Action(
-
-                ActionType.REPRODUCE
+            text
 
             )
+
+        )
+
+
+        if len(
+
+            self.life_events
+
+        ) > 10:
+
+            self.life_events.pop(0)
+
+    def update_drives(self, predators=None):
+
+        self.drives["hunger"] = (
+
+            max(0, 1 - self.energy / 400)
+
+        )
+
+
+        self.drives["reproduction"] = (
+
+            min(1, self.energy / 400)
+
+        )
+
+
+        self.drives["curiosity"] += 0.002
+
+        self.drives["curiosity"] = min(1, self.drives["curiosity"])
+
+        if predators:
+
+            fear = 0
+
+            for predator in predators:
+
+                d = math.hypot(
+
+                self.x - predator.x,
+
+                self.y - predator.y
+
+                )
+
+                if d < 100:
+                    fear += (100 - d) / 100
+
+
+            self.drives["fear"] = min(1, fear)
 
         else:
 
-            return Action(
-
-                ActionType.MOVE
-
-            )
-        
-    def perceive(self, environment):
-
-        nearest_food_distance = float("inf")
-
-        for food in environment.food:
-
-            distance = math.hypot(
-
-                self.x - food[0],
-
-                self.y - food[1]
-
-            )
-
-            nearest_food_distance = min(
-                nearest_food_distance,
-                distance
-            )
-
-        return {
-
-            "energy": self.energy,
-
-            "food_distance": nearest_food_distance
-
-        }
-    
-    def perceive(self, environment):
-
-        nearest_food = None
-
-        nearest_food_distance = float("inf")
-
-        for food in environment.food:
-
-            fx, fy = food
-
-            distance = math.hypot(
-
-                self.x - fx,
-
-                self.y - fy
-
-            )
-
-            if distance < nearest_food_distance:
-
-                nearest_food_distance = distance
-
-                nearest_food = food
-
-        return {
-
-            "energy": self.energy,
-
-            "age": self.age,
-
-            "nearest_food": nearest_food,
-
-            "food_distance": nearest_food_distance
-
-        }
+            self.drives["fear"] *= 0.95
