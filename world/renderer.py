@@ -21,6 +21,9 @@ class Renderer:
             "Artificial Evolution Laboratory"
         )
 
+        self.font = pygame.font.SysFont(None, 22)
+
+
     def draw_food(self, food_list):
 
         for food in food_list:
@@ -38,6 +41,20 @@ class Renderer:
 
         x = int(organism.x)
         y = int(organism.y)
+
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+
+        distance = (
+
+            (mouse_x - x)**2 +
+
+            (mouse_y - y)**2
+
+        )**0.5
+
+        if distance < 10:
+
+            self.draw_tooltip(organism)
 
         # Genome traits
         speed = organism.genome["speed"]
@@ -82,3 +99,53 @@ class Renderer:
                 (int(predator.x), int(predator.y)),
                 8
             )
+
+    def draw_tooltip(self, organism):
+
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+
+        lines = [
+
+            f"Energy: {organism.energy:.1f}",
+
+            f"Age: {organism.age}",
+
+            f"Speed: {organism.genome['speed']:.2f}",
+
+            f"Vision: {organism.genome['vision_radius']:.2f}",
+
+            f"Metabolism: {organism.genome['metabolism']:.2f}",
+
+            f"Size: {organism.genome['size']:.2f}"
+
+        ]
+
+        y_offset = 0
+
+        for line in lines:
+
+            text = self.font.render(
+
+                line,
+
+                True,
+
+                (255,255,255)
+
+            )
+
+            self.screen.blit(
+
+                text,
+
+                (
+
+                    mouse_x + 15,
+
+                    mouse_y + y_offset
+
+                )
+
+            )
+
+            y_offset += 20

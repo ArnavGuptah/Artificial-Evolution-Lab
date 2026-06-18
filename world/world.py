@@ -91,6 +91,25 @@ class World(Environment):
             self.food.append([food_x, food_y])
 
     def update(self):
+        self.actions = []
+
+        for organism in self.organisms:
+
+            action = organism.decide(self)
+
+            if action:
+
+                self.actions.append(
+
+                    (
+
+                    organism,
+
+                    action
+
+                    )
+
+                )
 
         self.tick += 1
 
@@ -141,6 +160,10 @@ class World(Environment):
             if not predator.is_dead()
         ]
 
+        for rule in self.rules:
+
+            rule.apply(self)
+
         if self.tick % 100 == 0:
 
             self.population_history.append(
@@ -167,9 +190,6 @@ class World(Environment):
             f"Avg Speed: {avg_speed:.2f}"
             )
 
-            for rule in self.rules:
-
-                rule.apply(self)
 
     def run(self):
 

@@ -1,3 +1,6 @@
+from core.action import Action
+
+
 class Agent:
 
     def __init__(self):
@@ -10,14 +13,10 @@ class Agent:
 
         pass
 
-    def decide(self):
+    def decide(self, environment):
 
-        pass
+        return None
 
-    def act(self):
+    def update(self, environment):
 
-        pass
-
-    def update(self):
-
-        pass
+        return self.decide(environment)
