@@ -1,3 +1,5 @@
+from core.action_type import ActionType
+
 class Action:
 
     def __init__(

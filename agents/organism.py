@@ -2,6 +2,7 @@ import random
 import math
 from core.agent import Agent
 from core.action import Action
+from core.action_type import ActionType
 
 from configs.settings import (
     WORLD_WIDTH,
@@ -174,17 +175,45 @@ class Organism(Agent):
 
         observation = self.perceive(environment)
 
-        if observation["energy"] < 100:
+        if (
 
-            return Action("EAT")
+            observation["energy"] < 100
 
-        elif self.energy > REPRODUCTION_THRESH:
+            and
 
-            return Action("REPRODUCE")
+            observation["food_distance"] < 100
+
+        ):
+
+            return Action(
+
+                ActionType.EAT
+
+            )
+
+        elif (
+
+            observation["energy"]
+
+            >
+
+            REPRODUCTION_THRESH
+
+        ):
+
+            return Action(
+
+                ActionType.REPRODUCE
+
+            )
 
         else:
 
-            return Action("MOVE")
+            return Action(
+
+                ActionType.MOVE
+
+            )
         
     def perceive(self, environment):
 
@@ -208,6 +237,42 @@ class Organism(Agent):
         return {
 
             "energy": self.energy,
+
+            "food_distance": nearest_food_distance
+
+        }
+    
+    def perceive(self, environment):
+
+        nearest_food = None
+
+        nearest_food_distance = float("inf")
+
+        for food in environment.food:
+
+            fx, fy = food
+
+            distance = math.hypot(
+
+                self.x - fx,
+
+                self.y - fy
+
+            )
+
+            if distance < nearest_food_distance:
+
+                nearest_food_distance = distance
+
+                nearest_food = food
+
+        return {
+
+            "energy": self.energy,
+
+            "age": self.age,
+
+            "nearest_food": nearest_food,
 
             "food_distance": nearest_food_distance
 
