@@ -1,7 +1,6 @@
 import random
 import math
 import uuid
-from xxlimited import new
 from core.agent import Agent
 from domains.tuberculosis.tb_genome import TB_GENE_BOUNDS
 from evolution.mutation import gaussian_mutate
@@ -34,11 +33,23 @@ class Bacteria(Agent):
 
             "replication_rate":
 
-                random.uniform(0.005,0.05),
+                random.uniform(0.0002,0.002),
 
-            "drug_resistance":
+            "inh_resistance":
 
-                random.uniform(0,1),
+                random.uniform(0,0.1),
+
+            "rif_resistance":
+
+                random.uniform(0,0.1),
+
+            "fluoroquinolone_resistance":
+
+                random.uniform(0,0.1),
+
+            "injectable_resistance":
+
+                random.uniform(0,0.1),
 
             "dormancy_tendency":
 
@@ -49,11 +60,10 @@ class Bacteria(Agent):
                 random.uniform(0,1)
 
         }
-        child_genome = gaussian_mutate( self.genome, TB_GENE_BOUNDS)
 
         self.state = "ACTIVE"
 
-        self.energy = 100
+        self.energy = -0.05
 
         self.age = 0
 
@@ -108,7 +118,19 @@ class Bacteria(Agent):
             return None
 
         probability = self.genome[ "replication_rate"]
+        fitness_cost = (
 
+            self.genome["inh_resistance"] * 0.3 +
+
+            self.genome["rif_resistance"] * 0.3 +
+
+            self.genome["fluoroquinolone_resistance"] * 0.2 +
+
+            self.genome["injectable_resistance"] * 0.2
+
+        )
+
+        probability *= (1 - fitness_cost * 0.5)
 
         if random.random() > probability:
 
@@ -151,9 +173,14 @@ class Bacteria(Agent):
             new = child.genome[gene]
 
 
-        if abs(new - old) > 0.05:
+            if abs(new - old) > 0.05:
 
-                child.mutations.append((gene, round( new-old, 3)))
+                child.mutations.append(
+                    {"gene" : gene, 
+                      "delta" : round( new-old, 3), 
+                      "generation": child.generation
+                    }
+                )
 
         return child
 
@@ -194,9 +221,45 @@ class Bacteria(Agent):
 
         if self.state == Bacteria.DORMANT:
 
-                self.energy -= 0.001
+                self.energy -= 0.05
+
+                if self.energy <= 0:
+
+                    self.state = Bacteria.DEAD
 
                 return
 
 
         self.move()
+
+    @property
+
+    def is_mdr(self):
+
+        return (
+
+        self.genome["inh_resistance"] > 0.7
+
+        and
+
+        self.genome["rif_resistance"] > 0.7
+
+        )
+    
+    @property
+
+    def is_xdr(self):
+
+        return (
+
+        self.is_mdr
+
+        and
+
+        self.genome["fluoroquinolone_resistance"] > 0.7
+
+        and
+
+        self.genome["injectable_resistance"] > 0.7
+
+        )

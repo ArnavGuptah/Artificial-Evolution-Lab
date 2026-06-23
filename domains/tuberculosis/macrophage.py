@@ -16,6 +16,8 @@ class Macrophage:
 
         self.y = y
 
+        self.exhaustion = 0
+
         self.state = Macrophage.HEALTHY
 
         self.intracellular_tb = 0
@@ -56,6 +58,16 @@ class Macrophage:
         self.move()
 
         if self.state == Macrophage.INFECTED:
+
+            self.exhaustion += 0.001
+
+            self.exhaustion = min(
+
+                1,
+
+                self.exhaustion
+
+            )
 
             self.signal_strength += 0.02
 
