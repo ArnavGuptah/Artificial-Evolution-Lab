@@ -269,6 +269,11 @@ class TBWorld:
 
                         b.state = Bacteria.DEAD
 
+                        print(
+                            f"INFECTED MACROPHAGE "
+                            f"TB:{b.id}"
+                        )
+
                     break
 
         if self.tick == 2000:
@@ -308,6 +313,7 @@ class TBWorld:
                 reproduction_added += 1
                 newborns.append(child)
 
+                self.bacteria.extend(newborns)
 
                 self.lineages[child.id] = {
 

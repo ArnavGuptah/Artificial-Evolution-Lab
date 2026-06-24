@@ -1,5 +1,10 @@
-from domains.tuberculosis.tb_world import TBWorld
+import sys
 
+log_file = open("tb_log.txt", "w")
+
+sys.stdout = log_file
+
+from domains.tuberculosis.tb_world import TBWorld
 
 def main():
 

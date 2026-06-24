@@ -63,7 +63,7 @@ class Bacteria(Agent):
 
         self.state = "ACTIVE"
 
-        self.energy = -0.05
+        self.energy = 50
 
         self.age = 0
 
@@ -118,6 +118,7 @@ class Bacteria(Agent):
             return None
 
         probability = self.genome[ "replication_rate"]
+
         fitness_cost = (
 
             self.genome["inh_resistance"] * 0.3 +
@@ -144,6 +145,11 @@ class Bacteria(Agent):
 
         )
 
+        self.energy -= 5
+
+        if self.energy <= 0:
+            self.state = Bacteria.DEAD
+            return None
 
         child = Bacteria(
 
@@ -221,7 +227,7 @@ class Bacteria(Agent):
 
         if self.state == Bacteria.DORMANT:
 
-                self.energy -= 0.05
+                self.energy -= 0.002
 
                 if self.energy <= 0:
 
@@ -231,6 +237,18 @@ class Bacteria(Agent):
 
 
         self.move()
+
+        if self.state == Bacteria.ACTIVE:
+            self.energy -= 0.01
+
+        elif self.state == Bacteria.STRESSED:
+            self.energy -= 0.005
+
+        elif self.state == Bacteria.REACTIVATING:
+            self.energy -= 0.007
+
+        if self.energy <= 0:
+            self.state = Bacteria.DEAD
 
     @property
 

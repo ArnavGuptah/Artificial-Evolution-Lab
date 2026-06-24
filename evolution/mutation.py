@@ -8,7 +8,7 @@ from configs.settings import QUANTUM_ENTROPY
 
 # ── Classical Gaussian Mutation ──────────────────────────────────────────────
 
-def gaussian_mutate(genome: dict, gene_bounds: dict, rate: float = 0.12, strength: float = 0.18) -> dict:
+def gaussian_mutate(genome: dict, gene_bounds: dict, rate: float = 0.12, strength: float = 0.40) -> dict:
 
     child = copy.deepcopy(genome)
 
