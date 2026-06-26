@@ -5,6 +5,8 @@ from domains.tuberculosis.granuloma import Granuloma
 from domains.tuberculosis.immune_cell import ImmuneCell
 from domains.tuberculosis.oxygen_field import OxygenField
 from domains.tuberculosis.tb_observables import TBObservables
+from domains.tuberculosis.tb_metabolism import TBMetabolism
+from domains.tuberculosis.tb_analytics import TBAnalytics
 from configs.settings import (
 
     WORLD_WIDTH,
@@ -22,9 +24,11 @@ from domains.tuberculosis.tb_renderer import TBRenderer
 class TBWorld:
 
 
-    def __init__(self):
+    def __init__(self, experiment=None):
 
         self.tick = 0
+
+        self.metabolism = TBMetabolism()
 
         self.treatment = {
 
@@ -37,6 +41,10 @@ class TBWorld:
             "EMB": False
 
         }
+
+        self.experiment = experiment
+
+        self.analytics = TBAnalytics()
 
         self.observables = TBObservables()
 
@@ -555,6 +563,21 @@ class TBWorld:
                 for b in self.bacteria
             ) / N
 
+            obs["average_atp"] = sum(
+                b.metabolism.atp
+                for b in self.bacteria
+            ) / N
+
+            obs["average_redox"] = sum(
+                b.metabolism.redox
+                for b in self.bacteria
+            ) / N
+
+            obs["average_cell_health"] = sum(
+                b.metabolism.cell_health
+                for b in self.bacteria
+            ) / N
+
             lineage_sizes = {}
 
             for b in self.bacteria:
@@ -709,6 +732,14 @@ class TBWorld:
                 f" | Avg RIF:{avg_rif:.2f}"
 
             )
+
+            print(
+                f"ATP:{obs['average_atp']:.3f} "
+                f"Redox:{obs['average_redox']:.3f} "
+                f"Health:{obs['average_cell_health']:.3f}"
+            )
+
+            self.analytics.record(self)
 
         if self.tick % 200 == 0:
 
@@ -900,6 +931,7 @@ class TBWorld:
 
             )
 
+        self.plotter.plot(self.analytics)
 
         pygame.quit()
 

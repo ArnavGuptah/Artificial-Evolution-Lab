@@ -31,7 +31,7 @@ def gaussian_mutate(genome: dict, gene_bounds: dict, rate: float = 0.12, strengt
         EDGE_MUTATION_RATE = 0.05
         EDGE_SIGMA = 0.05
 
-        for source in child["grn_weights"].items():
+        for source, targets in child["grn_weights"].items():
 
             for target in targets:
 
@@ -49,46 +49,6 @@ def gaussian_mutate(genome: dict, gene_bounds: dict, rate: float = 0.12, strengt
                             targets[target]
                         )
                     )
-
-        return child
-# ── GRN Weight Mutation ─────────────────────────────
-
-    if "grn_weights" in child:
-
-        EDGE_MUTATION_RATE = 0.05      # 5% chance per edge
-        EDGE_SIGMA = 0.05              # Gaussian std-dev
-        MIN_WEIGHT = -2.0
-        MAX_WEIGHT = 2.0
-
-        for source, targets in child["grn_weights"].items():
-
-            for target in targets:
-
-                if random.random() < EDGE_MUTATION_RATE:
-
-                    targets[target] += random.gauss(0, EDGE_SIGMA)
-
-                    targets[target] = max(
-                        MIN_WEIGHT,
-                        min(MAX_WEIGHT, targets[target])
-                    )
-
-    return child
-
-    if "grn_weights" in child:
-
-        if random.random() < 0.02:
-
-            sources = list(child["grn_weights"].keys())
-
-            source = random.choice(sources)
-
-            targets = list(child["grn_weights"][source].keys())
-
-            target = random.choice(targets)
-
-            child["grn_weights"][source][target] *= -1
-
 
 # ── Quantum-Inspired Mutation ────────────────────────────────────────────────
 

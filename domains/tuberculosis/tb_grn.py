@@ -21,7 +21,11 @@ class TBGRN:
             "mprA": 0.0
         }              
         
-        self.functions = {self.update_functions()}
+        self.functions = {
+            "growth": 1.0,
+            "replication": 1.0,
+            "efflux": 0.0
+        }
 
         self.physiology = {
             "energy": 1.0,
@@ -107,41 +111,58 @@ class TBGRN:
         # Clamp values to [0,1]
             g = new_genes
 
-        self.functions["growth"] = max(
-            0.0,
-            1.0 - 0.7 * self.regulators["dosR"]
-        )
-
-        self.functions["replication"] = self.functions["growth"]
-
-        self.functions["efflux"] = self.regulators["sigE"]
-
         self.regulators = new_genes
+
+        self.update_functions()
+
+        self.update_physiology()
 
         for gene in self.memory:
 
             self.memory[gene] = self.regulators[gene]
 
-    def phenotype(self):
+    def phenotype(self, metabolism):
 
         g = self.regulators
 
         self.current_phenotype = {
 
-            "growth_factor": self.physiology["metabolism"],
-            "stress_tolerance": 0.5 * (g["sigH"] + g["sigE"]),
-            "dormancy": g["dosR"],
-            "virulence": g["phoP"],
-            "drug_efflux": self.functions["efflux"] * self.physiology["cell_wall"],
-            "persistence": g["mprA"]
+            "growth_factor":
+
+                0.6 * self.functions["growth"]
+                + 0.4 * metabolism.atp,
+
+            "stress_tolerance":
+
+                0.4 * (g["sigH"] + g["sigE"])
+                + 0.6 * metabolism.cell_health,
+
+            "dormancy":
+
+                0.7 * g["dosR"]
+                + 0.3 * (1 - metabolism.atp),
+
+            "virulence":
+
+                0.6 * g["phoP"]
+                + 0.4 * metabolism.cell_health,
+
+            "drug_efflux":
+
+                self.functions["efflux"],
+
+            "persistence":
+
+                0.5 * g["mprA"]
+                + 0.5 * (1 - metabolism.atp)
 
         }
 
         return self.current_phenotype
     
-    def state_scores(self):
+    def state_scores(self, metabolism):
 
-        p = self.phenotype()
+        p = self.phenotype(metabolism)
 
         scores = {}
 
@@ -187,9 +208,9 @@ class TBGRN:
 
         return scores
     
-    def choose_state(self):
+    def choose_state(self, metabolism):
 
-        scores = self.state_scores()
+        scores = self.state_scores(metabolism)
 
         best_state = max(
             scores,
@@ -245,25 +266,29 @@ class TBGRN:
         r = self.regulators
         f = self.functions
 
-        f["growth"] = self.sigmoid(
+        growth_input = (
 
             TB_PARAMETERS["growth_bias"],
-            TB_PARAMETERS["growth_dosR_weight"]*r["dosR"],
-            TB_PARAMETERS["growth_sigH_weight"]*r["sigH"],
-            TB_PARAMETERS["growth_mprA_weight"]*r["mprA"],
-            TB_PARAMETERS["growth_phoP_weight"]*r["phoP"]
+            + TB_PARAMETERS["growth_dosR_weight"] * r["dosR"],
+            + TB_PARAMETERS["growth_sigH_weight"] * r["sigH"],
+            + TB_PARAMETERS["growth_mprA_weight"] * r["mprA"],
+            + TB_PARAMETERS["growth_phoP_weight"] * r["phoP"]
 
         )
+
+        f["growth"] = self.sigmoid(growth_input)
 
         f["replication"] = f["growth"]
 
-        f["efflux"] = self.sigmoid(
+        efflux_input = (
 
             TB_PARAMETERS["efflux_sigE_weight"]*r["sigE"],
 
-            TB_PARAMETERS["efflux_mprA_weight"]*r["mprA"]
+            + TB_PARAMETERS["efflux_mprA_weight"]*r["mprA"]
 
         )
+
+        f["efflux"] = self.sigmoid(efflux_input)
 
     def update_physiology(self):
 

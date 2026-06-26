@@ -24,6 +24,12 @@ class TBObservables:
 
             "average_phoP":0,
 
-            "average_whiB3":0
+            "average_whiB3":0,
+
+            "average_atp": 0.0,
+
+            "average_redox": 0.0,
+
+            "average_cell_health": 0.0
 
         }

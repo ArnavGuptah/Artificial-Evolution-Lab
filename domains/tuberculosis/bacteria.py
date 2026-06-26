@@ -5,6 +5,7 @@ from core.agent import Agent
 from domains.tuberculosis.tb_genome import TB_GENE_BOUNDS
 from evolution.mutation import gaussian_mutate
 from domains.tuberculosis.tb_grn import TBGRN
+from domains.tuberculosis.tb_metabolism import TBMetabolism
 import copy
 from domains.tuberculosis.tb_grn_network import REGULATORY_NETWORK
 
@@ -100,6 +101,8 @@ class Bacteria(Agent):
         )
 
         self.grn = TBGRN(self.genome)
+
+        self.metabolism = TBMetabolism()
 
     def move(self, oxygen_field):
 
@@ -214,6 +217,14 @@ class Bacteria(Agent):
 
         g = self.grn.genes
 
+        self.metabolism.update(
+
+            self.grn,
+
+            self.grn.inputs
+
+        )
+
         stress_cost = (
             0.003 * g["sigH"] +
             0.003 * g["sigE"] +
@@ -234,7 +245,7 @@ class Bacteria(Agent):
                 round(self.grn.genes["stress"], 2)
             )
 
-        phenotype = self.grn.phenotype()
+        phenotype = self.grn.phenotype(self.metabolism)
 
         if phenotype["dormancy"] > 0.70:
 
