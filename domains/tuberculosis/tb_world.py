@@ -531,212 +531,26 @@ class TBWorld:
 
                 )
 
-            obs = self.observables.data
+            self.observables.record(self)
 
-            N = max(1, len(self.bacteria))
-
-            obs["population"] = len(self.bacteria)
-
-            obs["active_fraction"] = active / N
-
-            obs["dormant_fraction"] = dormant / N
-
-            obs["stressed_fraction"] = stressed / N
-
-            obs["average_dosR"] = sum(
-                b.grn.regulators["dosR"]
-                for b in self.bacteria
-            ) / N
-
-            obs["average_sigH"] = sum(
-                b.grn.regulators["sigH"]
-                for b in self.bacteria
-            ) / N
-
-            obs["average_sigE"] = sum(
-                b.grn.regulators["sigE"]
-                for b in self.bacteria
-            ) / N
-
-            obs["average_growth"] = sum(
-                b.grn.functions["growth"]
-                for b in self.bacteria
-            ) / N
-
-            obs["average_atp"] = sum(
-                b.metabolism.atp
-                for b in self.bacteria
-            ) / N
-
-            obs["average_redox"] = sum(
-                b.metabolism.redox
-                for b in self.bacteria
-            ) / N
-
-            obs["average_cell_health"] = sum(
-                b.metabolism.cell_health
-                for b in self.bacteria
-            ) / N
-
-            lineage_sizes = {}
-
-            for b in self.bacteria:
-
-                founder = self.lineage_stats[b.id]["founder"]
-
-                lineage_sizes[founder] = (
-                    lineage_sizes.get(founder, 0) + 1
-                )
-
-            if lineage_sizes:
-
-                biggest = max(
-                    lineage_sizes,
-                    key=lineage_sizes.get
-                )
-
-
-                print(
-                    f"Largest Lineage: {biggest}"
-                    f" | Size: {lineage_sizes[biggest]}"
-                )
-
-
-            mdr_count = sum(
-
-                1
-
-                for b in self.bacteria
-
-                if b.is_mdr
-
-            )
-
-
-            self.avg_inh_history.append(
-
-                avg_inh
-
-            )
-
-            self.avg_rif_history.append(
-
-                avg_rif
-
-            )
-
-            avg_mdr = sum(
-
-                1
-
-                for b in self.bacteria
-
-                if b.is_mdr
-
-            )
-
-            avg_xdr = sum(
-
-                1
-
-                for b in self.bacteria
-
-                if b.is_xdr
-
+            print(
+                f"Population: {self.observables.history['population'][-1]}"
             )
 
             print(
-
-                f"MDR:{avg_mdr} "
-
-                f"XDR:{avg_xdr}"
-
-            )
-
-            self.population_history.append(
-
-                len(self.bacteria)
-
-            )
-
-            self.mdr_history.append(
-
-                mdr_count
-            )
-
-            active = sum(
-
-                1
-
-                for b in self.bacteria
-
-                if b.state == "ACTIVE"
-
-            )
-
-
-            dormant = sum(
-
-                1
-
-                for b in self.bacteria
-
-                if b.state == "DORMANT"
-
-            )
-
-            xdr = sum(
-
-                1
-
-                for b in self.bacteria
-
-                if b.is_xdr
-
-            )
-            if len(self.bacteria) > 0:
-                max_rep = max(
-                    b.genome["replication_rate"]
-                    for b in self.bacteria
-                )
-
-                avg_rep = sum(
-                    b.genome["replication_rate"]
-                    for b in self.bacteria
-                ) / len(self.bacteria)
-
-            else: 
-                max_rep = 0
-                avg_rep = 0
-
-            print(
-                f"Max Rep:{max_rep:.6f}"
+                f"DosR: {self.observables.history['average_dosR'][-1]:.3f}"
             )
 
             print(
-                f"Avg Rep:{avg_rep:.6f}"
+                f"ATP: {self.observables.history['average_atp'][-1]:.3f}"
             )
 
             print(
-
-                f"Tick:{self.tick}"
-
-                f" | Pop:{len(self.bacteria)}"
-
-                f" | MDR:{mdr_count}"
-
-                f" | XDR:{xdr}"
-
-                f" | Avg INH:{avg_inh:.2f}"
-
-                f" | Avg RIF:{avg_rif:.2f}"
-
+                f"Redox: {self.observables.history['average_redox'][-1]:.3f}"
             )
 
             print(
-                f"ATP:{obs['average_atp']:.3f} "
-                f"Redox:{obs['average_redox']:.3f} "
-                f"Health:{obs['average_cell_health']:.3f}"
+                f"Health: {self.observables.history['average_cell_health'][-1]:.3f}"
             )
 
             self.analytics.record(self)

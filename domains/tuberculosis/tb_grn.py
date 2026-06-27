@@ -76,7 +76,7 @@ class TBGRN:
 
         # Small decay so regulators fade over time
         for gene in g:
-            g[gene] *= 0.95
+            g[gene] *= TB_PARAMETERS["regulator_decay"]
 
         # ---------- Regulatory interactions ----------
 
@@ -268,10 +268,10 @@ class TBGRN:
 
         growth_input = (
 
-            TB_PARAMETERS["growth_bias"],
-            + TB_PARAMETERS["growth_dosR_weight"] * r["dosR"],
-            + TB_PARAMETERS["growth_sigH_weight"] * r["sigH"],
-            + TB_PARAMETERS["growth_mprA_weight"] * r["mprA"],
+            TB_PARAMETERS["growth_bias"]
+            + TB_PARAMETERS["growth_dosR_weight"] * r["dosR"]
+            + TB_PARAMETERS["growth_sigH_weight"] * r["sigH"]
+            + TB_PARAMETERS["growth_mprA_weight"] * r["mprA"]
             + TB_PARAMETERS["growth_phoP_weight"] * r["phoP"]
 
         )
@@ -282,7 +282,7 @@ class TBGRN:
 
         efflux_input = (
 
-            TB_PARAMETERS["efflux_sigE_weight"]*r["sigE"],
+            TB_PARAMETERS["efflux_sigE_weight"]*r["sigE"]
 
             + TB_PARAMETERS["efflux_mprA_weight"]*r["mprA"]
 

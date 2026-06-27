@@ -215,7 +215,7 @@ class Bacteria(Agent):
 
         self.grn.update(oxygen)
 
-        g = self.grn.genes
+        g = self.grn.regulators
 
         self.metabolism.update(
 
@@ -238,11 +238,13 @@ class Bacteria(Agent):
                 "O2:",
                 round(oxygen, 2),
                 "dosR:",
-                round(self.grn.genes["dosR"], 2),
+                round(self.grn.regulators["dosR"], 2),
                 "growth:",
-                round(self.grn.genes["growth"], 2),
-                "stress:",
-                round(self.grn.genes["stress"], 2)
+                round(self.grn.functions["growth"], 2),
+                "sigH:",
+                round(self.grn.regulators["sigH"], 2),
+                "sigE:",
+                round(self.grn.regulators["sigE"], 2)
             )
 
         phenotype = self.grn.phenotype(self.metabolism)
@@ -273,7 +275,7 @@ class Bacteria(Agent):
 
         if self.state == Bacteria.DORMANT:
 
-                self.energy -= (0.002 * (1 - self.grn.genes["dosR"]))
+                self.energy -= (0.002 * (1 - self.grn.regulators["dosR"]))
 
                 if self.energy <= 0:
 
@@ -288,7 +290,7 @@ class Bacteria(Agent):
             loss = 0.01
 
             loss *= (
-                1 - 0.3 * self.grn.genes["mprA"]
+                1 - 0.3 * self.grn.regulators["mprA"]
             )
 
             self.energy -= loss
