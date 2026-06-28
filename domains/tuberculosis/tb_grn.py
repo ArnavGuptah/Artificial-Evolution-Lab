@@ -1,7 +1,9 @@
 import random
-from domains.tuberculosis.tb_grn_network import REGULATORY_NETWORK
 import math
 from domains.tuberculosis.tb_parameters import TB_PARAMETERS
+from engine.grn.gene import Gene
+from engine.grn.connection import Connection
+from engine.grn.network import GRNNetwork
 
 class TBGRN:
 
@@ -19,7 +21,46 @@ class TBGRN:
             "whiB3": 0.0,         # Redox sensing
             "phoP": 0.5,          # Virulence regulation
             "mprA": 0.0
-        }              
+        }   
+
+        self.genes = {}
+
+        for name, value in self.regulators.items():
+
+            gene = Gene(
+
+                name,
+
+                expression=value,
+
+                decay=TB_PARAMETERS["regulator_decay"]
+
+            )
+
+            self.genes[name] = gene
+
+        self.connections = []
+
+        for source, targets in genome["grn_weights"].items():
+
+            for target, weight in targets.items():
+
+                if target not in self.genes:
+                    continue
+
+                c = Connection(
+                    self.genes[source],
+                    self.genes[target],
+                    weight
+                )
+
+                self.connections.append(c)
+
+                self.genes[source].add_outgoing(c)
+
+                self.genes[target].add_incoming(c)  
+
+        self.network = GRNNetwork(self.genes, self.connections) 
         
         self.functions = {
             "growth": 1.0,
@@ -33,7 +74,16 @@ class TBGRN:
             "cell_wall": 1.0,
             "redox_balance": 1.0
 
-}
+        }       
+
+        self.current_phenotype = {
+            "growth_factor": 0.0,
+            "stress_tolerance": 0.0,
+            "dormancy": 0.0,
+            "virulence": 0.0,
+            "drug_efflux": 0.0,
+            "persistence": 0.0
+        }
 
         self.inputs = {
             "oxygen": 1.0,
@@ -44,17 +94,6 @@ class TBGRN:
             "acidic_pH":0.0,
             "nitric_oxide":0.0,
             "iron_limitation":0.0
-        }
-
-        self.memory = {
-
-            "dosR": 0.0,
-            "sigH": 0.0,
-            "sigE": 0.0,
-            "mprA": 0.0,
-            "phoP": 0.0,
-            "whiB3": 0.0
-
         }
 
         self.sensitivity = {
@@ -72,54 +111,45 @@ class TBGRN:
         self.inputs["immune"] = immune
         self.inputs["nutrient"] = nutrient
 
-        g = self.regulators
-
-        # Small decay so regulators fade over time
-        for gene in g:
-            g[gene] *= TB_PARAMETERS["regulator_decay"]
-
         # ---------- Regulatory interactions ----------
 
         for _ in range(3):
 
-            new_genes = {}
+            external = {}
 
-            for gene in g:
+            for gene in self.genes:
+
+                gene_obj = self.genes[gene]
 
                 momentum = TB_PARAMETERS["regulator_momentum"]
 
-                total_input = (
+                external[gene] = (
 
-                    momentum * g[gene]
+                    momentum * gene_obj.expression
 
                     +
 
-                    (1 - momentum) * self.memory[gene]
+                    (1 - momentum) * gene_obj.previous_expression
+
+                    +
+
+                    self.environmental_signal(gene)
 
                 )
-    
-                total_input += self.environmental_signal(gene)
 
-    # Incoming regulation
-                for source, targets in self.genome["grn_weights"].items():
+            self.network.step(external)
 
-                    if gene in targets:
-                        total_input += g[source] * targets[gene]
+        self.regulators = {
 
-                new_genes[gene] = self.sigmoid(total_input)
+            name: gene.expression
 
-        # Clamp values to [0,1]
-            g = new_genes
+            for name, gene in self.genes.items()
 
-        self.regulators = new_genes
+        }
 
         self.update_functions()
 
         self.update_physiology()
-
-        for gene in self.memory:
-
-            self.memory[gene] = self.regulators[gene]
 
     def phenotype(self, metabolism):
 

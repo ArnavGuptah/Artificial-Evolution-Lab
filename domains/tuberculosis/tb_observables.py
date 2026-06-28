@@ -30,7 +30,9 @@ class TBObservables:
 
             "mdr_fraction": [],
 
-            "xdr_fraction": []
+            "xdr_fraction": [],
+
+            "average_grn_weight": []
         }
 
     def record(self, world):
@@ -150,3 +152,19 @@ class TBObservables:
             ) / N
 
         )
+
+        weights = []
+
+        for b in world.bacteria:
+
+            for c in b.grn.connections:
+
+                weights.append(c.weight)
+
+        if weights:
+
+            self.history["average_grn_weight"].append(
+
+                sum(weights) / len(weights)
+
+            )

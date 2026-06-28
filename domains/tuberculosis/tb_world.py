@@ -7,6 +7,8 @@ from domains.tuberculosis.oxygen_field import OxygenField
 from domains.tuberculosis.tb_observables import TBObservables
 from domains.tuberculosis.tb_metabolism import TBMetabolism
 from domains.tuberculosis.tb_analytics import TBAnalytics
+from domains.tuberculosis.cytokine_field import CytokineField
+from domains.tuberculosis.camera import Camera
 from configs.settings import (
 
     WORLD_WIDTH,
@@ -47,6 +49,14 @@ class TBWorld:
         self.analytics = TBAnalytics()
 
         self.observables = TBObservables()
+
+        self.cytokines = CytokineField(WORLD_WIDTH, WORLD_HEIGHT)
+
+        self.camera = Camera()
+
+        self.dragging = False
+
+        self.last_mouse = (0, 0)
 
         self.bacteria = []
 
@@ -95,6 +105,30 @@ class TBWorld:
         self.selected_bacteria = None
 
         self.oxygen = OxygenField(WORLD_WIDTH, WORLD_HEIGHT)
+
+        self.paused = False
+        self.simulation_speed = 1
+
+        self.debug = True
+
+        self.debug_stats = {}
+
+    # Simulation history (last 500 ticks)
+
+        self.history = {
+
+            "population": [],
+            "energy": [],
+            "growth": [],
+            "stress": [],
+            "dormancy": [],
+            "dosR": [],
+            "virulence": [],
+            "replication": [],
+            "cytokine": [],
+            "oxygen": []
+
+        }
 
         self.immune_cells = []
 
@@ -170,8 +204,6 @@ class TBWorld:
 
                 )
             )
-
-
 
     def update(self):
 
@@ -270,7 +302,7 @@ class TBWorld:
 
                 continue
 
-            child = b.reproduce()
+            child = b.reproduce(self)
 
 
             if child:
@@ -326,6 +358,10 @@ class TBWorld:
 
         for m in self.macrophages:
 
+            if m.state == Macrophage.INFECTED:
+
+                self.cytokines.deposit(m.x, m.y, amount=0.6)
+
             burst = m.update(self.bacteria)
 
             if burst:
@@ -369,6 +405,27 @@ class TBWorld:
                     }
 
                     new_bacteria.append(child)
+
+        # Recruit new macrophages based on inflammation
+        if self.tick % 300 == 0:
+
+            if (
+                self.cytokines.grid.max() > 2
+                and len(self.macrophages) < 150
+            ):
+
+                self.macrophages.append(
+
+                    Macrophage(
+
+                        random.randint(0, WORLD_WIDTH),
+                        random.randint(0, WORLD_HEIGHT)
+
+                    )
+
+                )
+
+                print("New macrophage recruited")
 
         MAX_BACTERIA = 2000
 
@@ -417,6 +474,66 @@ class TBWorld:
 
         if self.tick % 100 == 0:
 
+            print(
+
+                "Max Cytokine:",
+
+                round(self.cytokines.grid.max(), 3)
+
+            )
+
+            print(
+
+                f"Cytokine Avg : "
+
+                f"{self.debug_stats['cytokine_average']:.3f}"
+
+            )
+
+            print(
+
+                f"Cytokine Std : "
+
+                f"{self.debug_stats['cytokine_std']:.3f}"
+
+            )
+
+            print(
+
+                f"Hotspots : "
+
+                f"{self.debug_stats['cytokine_hotspots']}"
+
+            )
+
+            print(
+
+                f"Infected Macrophages : "
+
+                f"{self.debug_stats['infected_macrophages']}"
+
+            )
+
+            if self.debug_stats["infected_macrophages"] > 0:
+
+                print(
+
+                    "Recruitment Ratio:",
+
+                    round(
+
+                        len(self.macrophages)
+
+                        /
+
+                        self.debug_stats["infected_macrophages"],
+
+                        2
+
+                    )
+
+                )
+
             active = sum(
                 1 for b in self.bacteria
                 if b.state == Bacteria.ACTIVE
@@ -457,6 +574,30 @@ class TBWorld:
                 self.oxygen.grid.max(),
                 min(self.oxygen.grid.flatten()),
                 max(self.oxygen.grid.flatten())
+            )
+
+            print(
+
+                f"O2 Avg : "
+
+                f"{self.debug_stats['oxygen_average']:.3f}"
+
+            )
+
+            print(
+
+                f"O2 Std : "
+
+                f"{self.debug_stats['oxygen_std']:.3f}"
+
+            )
+
+            print(
+
+                f"Hypoxic TB : "
+
+                f"{self.debug_stats['hypoxic_bacteria']}"
+
             )
 
             if self.bacteria:
@@ -515,21 +656,66 @@ class TBWorld:
 
             print("\nAverage GRN Activity")
 
-            for regulator in self.grn_history:
+            low_o2 = []
 
-                print(
+            high_o2 = []
 
-                    regulator,
+            for b in self.bacteria:
 
-                    round(
+                o2 = self.oxygen.oxygen_at(
+                    b.x,
+                    b.y
+                )
 
-                        self.grn_history[regulator][-1],
+                if o2 < 0.30:
 
-                        3
-
+                    low_o2.append(
+                        b.grn.regulators["dosR"]
                     )
 
+                else:
+
+                    high_o2.append(
+                        b.grn.regulators["dosR"]
+                    )
+
+            if low_o2:
+
+                print(
+                    "Low O2 dosR :",
+                    round(
+                        sum(low_o2)/len(low_o2),
+                        3
+                    )
                 )
+
+            if high_o2:
+
+                print(
+                    "High O2 dosR :",
+                    round(
+                        sum(high_o2)/len(high_o2),
+                        3
+                    )
+                )
+
+            for regulator in self.grn_history:
+
+                if self.grn_history[regulator]:
+
+                    print(
+
+                        regulator,
+
+                        round(
+
+                            self.grn_history[regulator][-1],
+
+                            3
+
+                        )
+
+                    )
 
             self.observables.record(self)
 
@@ -549,11 +735,53 @@ class TBWorld:
                 f"Redox: {self.observables.history['average_redox'][-1]:.3f}"
             )
 
+            history = self.observables.history["average_grn_weight"]
+
+            if history:
+                print(f"Avg GRN Weight: {history[-1]:.3f}")
+            else:
+                print("Avg GRN Weight: N/A")
+
+
             print(
                 f"Health: {self.observables.history['average_cell_health'][-1]:.3f}"
             )
 
             self.analytics.record(self)
+
+            print("\n========== EVOLUTION REPORT ==========")
+
+            print(
+                f"Population          : {self.debug_stats['population']}"
+            )
+
+            print(
+                f"Living Lineages     : {self.debug_stats['living_lineages']}"
+            )
+
+            print(
+                f"Max Generation      : {self.debug_stats['max_generation']}"
+            )
+
+            print(
+                f"Average Generation  : "
+                f"{self.debug_stats['average_generation']:.2f}"
+            )
+
+            print(
+                f"Largest Family      : {self.debug_stats['largest_family']}"
+            )
+
+            print(
+                f"Unique Genomes      : {self.debug_stats['unique_genomes']}"
+            )
+
+            print(
+                f"Average Mutations   : "
+                f"{self.debug_stats['average_mutations']:.2f}"
+            )
+
+            print("======================================\n")
 
         if self.tick % 200 == 0:
 
@@ -624,18 +852,20 @@ class TBWorld:
 
         for immune in self.immune_cells:
 
+            immune.move_up_cytokine_gradient(self.cytokines)
+
             strongest = None
 
             signal = 0
 
 
-            for m in self.macrophages:
+            #for m in self.macrophages:
 
-                if m.signal_strength > signal:
+            #    if m.signal_strength > signal:
 
-                    signal = m.signal_strength
+            #        signal = m.signal_strength
 
-                    strongest = m
+            #        strongest = m
 
 
             if strongest:
@@ -664,67 +894,372 @@ class TBWorld:
 
                         )
 
-    def update_environment(self):
+        self.camera.update()
 
-        self.oxygen.update(self.granulomas)
+        self.compute_debug_stats()
+
+    def compute_debug_stats(self):
+
+        alive = [b for b in self.bacteria if b.state != Bacteria.DEAD]
+
+        infected_macrophages = sum(
+
+            1
+
+            for m in self.macrophages
+
+            if m.state == Macrophage.INFECTED
+
+        )
+
+        hypoxic = 0
+
+        for b in alive:
+
+            o2 = self.oxygen.oxygen_at(b.x, b.y)
+
+            if o2 < 0.30:
+
+                hypoxic += 1
+
+        if not self.bacteria:
+            return
+
+        N = max(1, len(alive))
+
+        self.debug_stats = {
+
+            "population": len(alive),
+
+            "hypoxic_bacteria": hypoxic,
+
+            "births": 0,
+
+            "deaths": 0,
+
+            "avg_energy":
+                sum(b.energy for b in alive) / N,
+
+            "avg_growth":
+                sum(
+                    b.grn.current_phenotype.get("growth_factor", 0.0)
+                    for b in alive
+                ) / N,
+
+            "avg_dormancy":
+                sum(
+                    b.grn.current_phenotype.get("dormancy", 0.0)
+                    for b in alive
+                ) / N,
+
+            "avg_stress":
+                sum(
+                    b.grn.current_phenotype.get("stress_tolerance", 0.0)
+                    for b in alive
+                ) / N,
+
+            "avg_dosR":
+                sum(
+                    b.grn.regulators["dosR"]
+                    for b in alive
+                ) / N,
+
+            "avg_sigH":
+                sum(
+                    b.grn.regulators["sigH"]
+                    for b in alive
+                ) / N,
+
+            "avg_sigE":
+                sum(
+                    b.grn.regulators["sigE"]
+                    for b in alive
+                ) / N,
+
+            "avg_mprA":
+                sum(
+                    b.grn.regulators["mprA"]
+                    for b in alive
+                ) / N,
+
+            "avg_replication":
+                sum(
+                    b.genome["replication_rate"]
+                    for b in alive
+                ) / N,
+
+            "avg_virulence":
+                sum(
+                    b.genome["virulence"]
+                    for b in alive
+                ) / N,
+
+            "avg_dormancy_gene":
+                sum(
+                    b.genome["dormancy_tendency"]
+                    for b in alive
+                ) / N,
+
+            "oxygen_min":
+                float(self.oxygen.grid.min()),
+
+            "oxygen_max":
+                float(self.oxygen.grid.max()),
+
+            "oxygen_average":
+                float(self.oxygen.grid.mean()),
+
+            "oxygen_std":
+                float(self.oxygen.grid.std()),
+
+            "cytokine_max":
+                float(self.cytokines.grid.max()),
+
+            "cytokine_average":
+                float(self.cytokines.grid.mean()),
+
+            "cytokine_std":
+                float(self.cytokines.grid.std()),
+
+            "infected_macrophages":
+                infected_macrophages,
+
+            "macrophages":
+                len(self.macrophages),
+
+            "granulomas":
+                len(self.granulomas),
+
+            "max_generation":
+                max(
+                    b.generation
+                    for b in alive
+                ) if alive else 0,
+
+            "average_generation":
+                sum(
+                    b.generation
+                    for b in alive
+                ) / N,
+
+            "unique_genomes":
+                len({
+
+                    (
+                        round(b.genome["replication_rate"],3),
+                        round(b.genome["virulence"],3),
+                        round(b.genome["dormancy_tendency"],3)
+
+                    )
+
+                    for b in alive
+
+                }),
+
+            "average_mutations":
+                sum(
+                    len(b.mutations)
+                    for b in alive
+                ) / N,
+
+            "oldest_age":
+                max(
+                    b.age
+                    for b in alive
+                ) if alive else 0,
+
+            "largest_family":
+                max(
+                    len(b.children)
+                    for b in alive
+                ) if alive else 0,
+
+            "living_lineages":
+                len({
+                    b.founder_id
+                    for b in alive
+                }),
+        }
+
+            # Store history
+
+        self.history["population"].append(len(self.bacteria))
+
+        self.history["energy"].append(
+            self.debug_stats["avg_energy"]
+        )
+
+        self.history["growth"].append(
+            self.debug_stats["avg_growth"]
+        )
+
+        self.history["stress"].append(
+            self.debug_stats["avg_stress"]
+        )
+
+        self.history["dormancy"].append(
+            self.debug_stats["avg_dormancy"]
+        )
+
+        self.history["dosR"].append(
+            self.debug_stats["avg_dosR"]
+        )
+
+        self.history["virulence"].append(
+            self.debug_stats["avg_virulence"]
+        )
+
+        self.history["replication"].append(
+            self.debug_stats["avg_replication"]
+        )
+
+        self.history["cytokine"].append(
+            self.debug_stats["cytokine_max"]
+        )
+
+        self.history["oxygen"].append(
+            self.debug_stats["oxygen_min"]
+        )
+
+        hotspots = 0
+
+        for row in range(self.cytokines.rows):
+
+            for col in range(self.cytokines.cols):
+
+                if self.cytokines.grid[row, col] > 2.0:
+
+                    hotspots += 1
+
+        self.debug_stats["cytokine_hotspots"] = hotspots
+
+        MAX_HISTORY = 500
+
+        for values in self.history.values():
+
+            if len(values) > MAX_HISTORY:
+
+                values.pop(0)
+
+    def update_environment(self):
 
         self.oxygen.consume_oxygen(self.bacteria)
 
-    def run(self):
+        self.cytokines.update()
 
+    def run(self):
 
         clock = pygame.time.Clock()
 
-
         running = True
-
 
         while running:
 
-
             for event in pygame.event.get():
 
-                if event.type == pygame.KEYDOWN:
+                if event.type == pygame.QUIT:
+                    running = False
+
+                elif event.type == pygame.KEYDOWN:
 
                     if event.key == pygame.K_o:
+                        self.renderer.show_oxygen = not self.renderer.show_oxygen
 
-                        self.renderer.show_oxygen = (
+                    elif event.key == pygame.K_c:
+                        self.renderer.show_cytokines = not self.renderer.show_cytokines
 
-                            not self.renderer.show_oxygen
+                    elif event.key == pygame.K_F1:
+                        self.debug = not self.debug
 
-                        )
+                    elif event.key == pygame.K_r:
+                        self.camera.reset()
+
+                    elif event.key == pygame.K_SPACE:
+                        self.paused = not self.paused
+
+                    elif event.key == pygame.K_PERIOD:
+                        self.simulation_speed = min(16, self.simulation_speed * 2)
+
+                    elif event.key == pygame.K_COMMA:
+                        self.simulation_speed = max(1, self.simulation_speed // 2)
+
+                    elif event.key == pygame.K_n:
+                        if self.paused:
+                            for _ in range(self.simulation_speed):
+                                self.update()
+
                 elif event.type == pygame.MOUSEBUTTONDOWN:
 
-                    if event.button == 1:
+                    # Right click → start dragging
+                    if event.button == 3:
+                        self.dragging = True
+                        self.last_mouse = pygame.mouse.get_pos()
+
+                    # Left click → select bacteria
+                    elif event.button == 1:
 
                         mx, my = pygame.mouse.get_pos()
+                        mx, my = self.camera.screen_to_world(mx, my)
 
                         self.selected_bacteria = None
 
-
                         for b in self.bacteria:
-
-                            d = math.hypot(
-
-                                b.x - mx,
-
-                                b.y - my
-
-                            )
-
-                            if d < 8:
-
+                            if math.hypot(b.x - mx, b.y - my) < 8:
                                 self.selected_bacteria = b
-
                                 break
 
-                if event.type == pygame.QUIT:
+                elif event.type == pygame.MOUSEBUTTONUP:
 
-                    running = False
+                    if event.button == 3:
+                        self.dragging = False
 
+                elif event.type == pygame.MOUSEMOTION:
 
-            self.update()
+                    if self.dragging:
 
+                        mx, my = pygame.mouse.get_pos()
+
+                        dx = mx - self.last_mouse[0]
+                        dy = my - self.last_mouse[1]
+
+                        self.camera.move(
+                            -dx / self.camera.zoom,
+                            -dy / self.camera.zoom
+                        )
+
+                        self.last_mouse = (mx, my)
+
+                elif event.type == pygame.MOUSEWHEEL:
+
+                    if event.y > 0:
+                        self.camera.zoom_in()
+
+                    elif event.y < 0:
+                        self.camera.zoom_out()
+
+            keys = pygame.key.get_pressed()
+
+            speed = 15
+
+            if keys[pygame.K_w]:
+                self.camera.move(0, -speed)
+
+            if keys[pygame.K_s]:
+                self.camera.move(0, speed)
+
+            if keys[pygame.K_a]:
+                self.camera.move(-speed, 0)
+
+            if keys[pygame.K_d]:
+                self.camera.move(speed, 0)
+
+            if not self.paused:
+
+                for _ in range(self.simulation_speed):
+
+                    self.update()
+
+            history_size = len(self.history["population"])
 
             self.renderer.draw(
 
@@ -734,9 +1269,15 @@ class TBWorld:
                 self.immune_cells,
                 self.treatment,
                 self.oxygen,
+                self.cytokines,
                 self.macrophages,
                 self.selected_bacteria,
-                self.bacteria_by_id
+                self.bacteria_by_id,
+                self.camera,
+                self.paused,
+                self.simulation_speed,
+                self.debug_stats,
+                history_size
             )
 
             clock.tick(
@@ -806,6 +1347,25 @@ class TBWorld:
                 " -> ".join(lineage)
 
             )
+
+    def bacteria_near(self, x, y, radius):
+
+        count = 0
+
+        r2 = radius * radius
+
+        for b in self.bacteria:
+
+            if b.state == Bacteria.DEAD:
+                continue
+
+            dx = b.x - x
+            dy = b.y - y
+
+            if dx*dx + dy*dy <= r2:
+                count += 1
+
+        return count
 
     def apply_treatment(self, b):
 
@@ -940,3 +1500,22 @@ class TBWorld:
                     }
 
         return new_granuloma_bacteria
+    
+    def bacteria_near(self, x, y, radius):
+
+        count = 0
+
+        r2 = radius * radius
+
+        for b in self.bacteria:
+
+            if b.state == Bacteria.DEAD:
+                continue
+
+            dx = b.x - x
+            dy = b.y - y
+
+            if dx*dx + dy*dy < r2:
+                count += 1
+
+        return count

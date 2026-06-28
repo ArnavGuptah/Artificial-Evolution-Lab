@@ -26,9 +26,9 @@ class Macrophage:
 
         self.signal_strength = 0
 
-        self.vision_radius = 100
+        self.vision_radius = 140
 
-        self.speed = 2.5
+        self.speed = random.uniform(2.0, 3.2)
 
     def move(self):
 
@@ -52,7 +52,7 @@ class Macrophage:
             dx = b.x - self.x
             dy = b.y - self.y
 
-            dist = math.hypot(dx, dy)
+            dist = math.hypot(dx,dy)
 
             if dist < nearest_dist and dist < self.vision_radius:
 
@@ -68,8 +68,13 @@ class Macrophage:
 
             if dist > 0:
 
-                self.x += self.speed * dx / dist
-                self.y += self.speed * dy / dist
+                speed = self.speed
+
+                if dist < 40:
+                    speed *= 1.5
+
+                self.x += speed * dx / dist
+                self.y += speed * dy / dist
 
             return nearest
 

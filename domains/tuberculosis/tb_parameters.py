@@ -47,6 +47,11 @@ TB_PARAMETERS = {
     # ------------------------
 
     "edge_mutation_rate":0.05,
-    "edge_sigma":0.05
+    "edge_sigma":0.05,
+
+    "cytokine_resolution": 10,
+    "cytokine_diffusion": 0.20,
+    "cytokine_decay": 0.01,
+    "cytokine_deposit": 1.0
 
 }

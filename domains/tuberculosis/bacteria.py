@@ -2,6 +2,7 @@ import random
 import math
 import uuid
 from core.agent import Agent
+from engine.grn.mutation import GRNMutation
 from domains.tuberculosis.tb_genome import TB_GENE_BOUNDS
 from evolution.mutation import gaussian_mutate
 from domains.tuberculosis.tb_grn import TBGRN
@@ -27,7 +28,7 @@ class Bacteria(Agent):
 
         super().__init__()
 
-        self.id = str(uuid.uuid4())[:6]
+        self.id = uuid.uuid4().hex[:8]
 
         self.x = x
 
@@ -66,13 +67,15 @@ class Bacteria(Agent):
 
             self.genome = genome
 
-        for source, targets in REGULATORY_NETWORK.items():
+        if not self.genome["grn_weights"]:
 
-            self.genome["grn_weights"][source] = {}
+            for source, targets in REGULATORY_NETWORK.items():
 
-            for target in targets:
+                self.genome["grn_weights"][source] = {}
 
-                self.genome["grn_weights"][source][target] = random.uniform(-1.0, 1.0)
+                for target in targets:
+
+                    self.genome["grn_weights"][source][target] = random.uniform(-1.0,1.0)
 
         self.state = "ACTIVE"
 
@@ -89,6 +92,8 @@ class Bacteria(Agent):
         self.mutations = []
 
         self.birth_tick = 0
+
+        self.founder_id = self.id
 
         self.lineage_color = (
 
@@ -122,15 +127,19 @@ class Bacteria(Agent):
                 best_angle = angle
 
 
-    def reproduce(self):
+    def reproduce(self, world):
 
-        if self.state != Bacteria.ACTIVE:
-
+        if self.state not in (
+            Bacteria.ACTIVE,
+            Bacteria.REACTIVATING
+        ):
             return None
 
-        phenotype = self.grn.phenotype()
+        phenotype = self.grn.phenotype(self.metabolism)
 
-        probability = (self.genome[ "replication_rate"] * self.grn.current_phenotype["growth_factor"])
+        probability = (self.genome[ "replication_rate"] * self.grn.current_phenotype["growth_factor"] * 5.0)
+
+        probability = min(probability, 0.10)
 
         fitness_cost = (
 
@@ -145,6 +154,34 @@ class Bacteria(Agent):
         )
 
         probability *= (1 - fitness_cost * 0.5)
+
+        oxygen = self.grn.inputs["oxygen"]
+
+        probability *= oxygen
+
+        neighbors = world.bacteria_near(
+            self.x,
+            self.y,
+            25
+        )
+
+        density_factor = max(
+            0.15,
+            1 - neighbors / 35
+        )
+
+        probability *= density_factor
+
+        if random.random() < 0.0005:
+            print(
+                f"[REPRO] ID={self.id} "
+                f"State={self.state} "
+                f"Prob={probability:.5f} "
+                f"Growth={self.grn.current_phenotype['growth_factor']:.3f} "
+                f"Energy={self.energy:.1f}"
+                f"Density={neighbors} "
+                f"Factor={density_factor:.2f}"
+            )
 
         if random.random() > probability:
 
@@ -174,12 +211,23 @@ class Bacteria(Agent):
 
         )
 
+        GRNMutation.mutate_connections(child.grn.connections)
 
         child.parent_id = self.id
 
         child.generation = (self.generation + 1)
 
-        child.birth_tick = self.age
+        self.children.append(child.id)
+
+        print(
+            f"[Birth] "
+            f"{self.id} -> {child.id} "
+            f"Generation {child.generation}"
+        )
+
+        child.birth_tick = world.tick
+
+        child.founder_id = self.founder_id
 
         child.lineage_color = (self.lineage_color)
 
@@ -249,25 +297,28 @@ class Bacteria(Agent):
 
         phenotype = self.grn.phenotype(self.metabolism)
 
-        if phenotype["dormancy"] > 0.70:
+        if phenotype["dormancy"] > 0.80:
 
             self.state = Bacteria.DORMANT
 
-        elif phenotype["stress_tolerance"] > 0.50:
+        elif (
+            phenotype["stress_tolerance"] > 0.75
+            and self.grn.inputs["immune"] > 0.30
+        ):
 
             self.state = Bacteria.STRESSED
 
-        else:
+        elif (
+            phenotype["growth_factor"] > 0.45
+        ):
 
             self.state = Bacteria.ACTIVE
 
-        if oxygen > 0.7:
+        else:
 
-            self.energy += 0.01
+            self.state = Bacteria.REACTIVATING
 
-        elif oxygen > 0.3:
-
-            self.energy += 0.005
+        self.energy += oxygen * 0.12
 
         self.energy = min(self.energy, 100)
 
