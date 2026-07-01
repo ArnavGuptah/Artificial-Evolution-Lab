@@ -146,17 +146,19 @@ class OxygenField:
 
             if 0 <= r < self.rows and 0 <= c < self.cols:
 
+                growth = b.grn.functions["growth"]
+
                 if b.state == b.ACTIVE:
-                    consumption = 0.05
+                    consumption = 0.004 + 0.012 * growth
 
                 elif b.state == b.REACTIVATING:
-                    consumption = 0.035
+                    consumption = 0.003 + 0.008 * growth
 
                 elif b.state == b.STRESSED:
-                    consumption = 0.02
+                    consumption = 0.002 + 0.004 * growth
 
                 else:   # DORMANT
-                    consumption = 0.008
+                    consumption = 0.0005 + 0.001 * growth
 
                 self.grid[r, c] -= consumption
 

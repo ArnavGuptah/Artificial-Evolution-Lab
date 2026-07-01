@@ -29,6 +29,7 @@ def gaussian_mutate(genome: dict, gene_bounds: dict, rate: float = 0.12, strengt
     if "grn_weights" in child:
 
         EDGE_MUTATION_RATE = 0.05
+
         EDGE_SIGMA = 0.05
 
         for source, targets in child["grn_weights"].items():

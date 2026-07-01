@@ -152,11 +152,19 @@ class Bacteria(Agent):
         ):
             return None
 
-        phenotype = self.grn.phenotype(self.metabolism)
+        fitness_factor = min(2.0, self.fitness / 15.0)
 
-        probability = (self.genome[ "replication_rate"] * self.grn.current_phenotype["growth_factor"] * 5.0)
+        probability = (
+            self.genome["replication_rate"]
+            * self.grn.current_phenotype["growth_factor"]
+            * fitness_factor
+        )
 
-        probability = min(probability, 0.10)
+        probability = max(0.0, min(probability, 0.15))
+
+        # Don't allow severely damaged bacteria to replicate
+        if self.metabolism.cell_health < 0.30:
+            return None
 
         fitness_cost = (
 
@@ -190,6 +198,15 @@ class Bacteria(Agent):
         probability *= density_factor
 
         if random.random() > probability:
+
+            if self.fitness < 8:
+
+                self.energy -= 0.2
+
+                if self.energy <= 0:
+
+                    self.state = Bacteria.DEAD
+
             return None
 
         child_genome = gaussian_mutate(
@@ -258,10 +275,18 @@ class Bacteria(Agent):
                     }
                 )
 
+        if self.fitness < 8:
+
+            self.energy -= 0.2
+
+            if self.energy <= 0:
+
+                self.state = Bacteria.DEAD
+
         return child
 
 
-    def update(self, oxygen_field, treatment):
+    def update(self, oxygen_field, treatment, macrophages, immune_cells):
 
         self.age += 1
 
@@ -269,33 +294,97 @@ class Bacteria(Agent):
 
         immune = 0.0
 
-        drug = 1.0 if any(treatment.values()) else 0.0
+        for m in macrophages:
+
+            d = math.hypot(
+                self.x - m.x,
+                self.y - m.y
+            )
+
+            if d < 80:
+
+                immune += (1.0 - d / 80)
+
+        immune = min(1.0, immune)
+
+        for cell in immune_cells:
+
+            d = math.hypot(
+                self.x - cell.x,
+                self.y - cell.y
+            )
+
+            if d < 50:
+
+                immune += 0.3 * (1 - d / 50)
+
+        immune = min(1.0, immune)
+
+        nutrient = oxygen
+
+        nitric_oxide = min(1.0, immune * 0.8)
+
+        drug = sum(treatment.values()) / len(treatment)
 
         self.grn.update(
             oxygen,
             immune=immune,
-            drug=drug
+            drug=drug,
+            nutrient=nutrient,
+            nitric_oxide=nitric_oxide
         )
-        
+
         g = self.grn.regulators
 
         self.metabolism.update(
-
             self.grn,
-
             self.grn.inputs
+        )
 
+        if self.state == Bacteria.DORMANT:
+
+            self.metabolism.atp += 0.01
+
+        else:
+
+            self.metabolism.atp -= 0.005
+
+        self.metabolism.atp = max(
+            0.0,
+            min(1.0, self.metabolism.atp)
         )
 
         stress_cost = (
-            0.003 * g["sigH"] +
+            0.004 * g["sigH"] +
             0.003 * g["sigE"] +
-            0.002 * g["mprA"]
+            0.002 * g["mprA"] +
+            0.004 * immune
         )
 
         self.energy -= stress_cost
 
-        phenotype = self.grn.phenotype(self.metabolism)
+        self.metabolism.cell_health -= (
+
+            0.003 * immune
+
+        )
+
+        self.metabolism.cell_health = max(
+
+            0.0,
+
+            self.metabolism.cell_health
+
+        )
+
+        if random.random() < 0.0005:
+            print(
+                f"O2={oxygen:.2f} "
+                f"Imm={immune:.2f} "
+                f"Drug={drug:.2f} "
+                f"State={self.grn.choose_state(self.metabolism)} "
+                f"Scores={self.grn.state_scores(self.metabolism)}"
+            )
 
         self.state = self.grn.choose_state(self.metabolism)
 
@@ -307,49 +396,68 @@ class Bacteria(Agent):
 
         if self.state == Bacteria.DORMANT:
 
-                self.energy -= (0.002 * (1 - self.grn.regulators["dosR"]))
+            self.energy -= (
+                0.001 * (1 - self.grn.regulators["dosR"])
+            )
 
-                if self.energy <= 0:
+            # Slow ATP recovery while dormant
+            self.metabolism.atp = min(
+                1.0,
+                self.metabolism.atp + 0.005
+            )
 
-                    self.state = Bacteria.DEAD
-
-                return
+            if self.energy <= 0:
+                self.state = Bacteria.DEAD
 
 
         self.move(oxygen_field)
 
-        if self.state == Bacteria.ACTIVE:
-            loss = 0.01
+        drug_pressure = (
+            drug *
+            (1.0 - self.grn.functions["efflux"])
+        )
 
-            loss *= (
-                1 - 0.3 * self.grn.regulators["mprA"]
+        if self.state == Bacteria.ACTIVE:
+
+            self.energy -= (
+                0.01 +
+                0.15 * drug_pressure
             )
 
-            self.energy -= loss
-
         elif self.state == Bacteria.STRESSED:
-            self.energy -= 0.005
+
+            self.energy -= (
+                0.005 +
+                0.10 * drug_pressure
+            )
+
+        elif self.state == Bacteria.DORMANT:
+
+            self.energy -= (
+                0.002 +
+                0.01 * drug_pressure
+            )
 
         elif self.state == Bacteria.REACTIVATING:
-            self.energy -= 0.007
+
+            self.energy -= (
+                0.007 +
+                0.12 * drug_pressure
+            )
 
         if self.energy <= 0:
             self.state = Bacteria.DEAD
 
+        diversity_bonus = random.uniform(0.95, 1.05)
+
         self.fitness = (
 
             0.30 * self.energy
-
             +
-
             0.30 * self.grn.current_phenotype["growth_factor"]
-
             +
-
             0.20 * self.metabolism.cell_health
-
             +
-
             0.20 * self.metabolism.atp
 
         )

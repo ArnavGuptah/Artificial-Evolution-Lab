@@ -330,8 +330,8 @@ class TBWorld:
                 if dx*dx + dy*dy < 64:   
                     
                     kill_prob = max(
-                        0.35, 
-                        0.9 - m.exhaustion
+                        0.25, 
+                        0.75 - 0.5 * m.exhaustion
                     )
 
                     if random.random() < kill_prob:
@@ -374,7 +374,12 @@ class TBWorld:
 
         for b in self.bacteria[:]:
 
-            b.update(self.oxygen, self.treatment)
+            b.update(
+                self.oxygen, 
+                self.treatment, 
+                self.macrophages, 
+                self.immune_cells
+            )
 
             if (
                 self.first_dormancy_tick is None
@@ -392,6 +397,13 @@ class TBWorld:
 
             child = b.reproduce(self)
 
+            if (
+                child
+                and child.grn.regulators["dosR"] < 0.02
+                and child.grn.regulators["sigH"] < 0.02
+            ):
+
+                continue
 
             if child:
                 
@@ -447,28 +459,26 @@ class TBWorld:
 
             if burst:
 
+                released = int(m.intracellular_tb)
+
                 print(
-
-                    f"Macrophage burst -> "
-
-                    f"{m.intracellular_tb} TB released"
-
+                    f"Macrophage burst -> {released} TB released"
                 )
 
-                for _ in range(m.intracellular_tb):               
+                for _ in range(released):
 
-                    angle = random.uniform(0, 2*math.pi)
-
-                    radius = random.uniform(5,40)
+                    angle = random.uniform(0, 2 * math.pi)
+                    radius = random.uniform(5, 40)
 
                     child = Bacteria(
-
-                        m.x + radius*math.cos(angle),
-
-                        m.y + radius*math.sin(angle), 
-
+                        m.x + radius * math.cos(angle),
+                        m.y + radius * math.sin(angle),
                         config=self.config
                     )
+
+                    child.energy = 40
+                    child.metabolism.atp = 0.4
+                    child.state = Bacteria.STRESSED
 
                     self.lineages[child.id] = {
                         "parent": None,
@@ -481,6 +491,9 @@ class TBWorld:
                     }
 
                     new_bacteria.append(child)
+
+                m.intracellular_tb = 0
+
 
         # Recruit new macrophages based on inflammation
         if self.tick % 300 == 0:
@@ -729,18 +742,23 @@ class TBWorld:
 
             immune.move_up_cytokine_gradient(self.cytokines)
 
+            self.cytokines.deposit(
+                immune.x,
+                immune.y,
+                amount=-0.02
+            )
+
             strongest = None
 
             signal = 0
 
 
-            #for m in self.macrophages:
+            for m in self.macrophages:
 
-            #    if m.signal_strength > signal:
+                if m.signal_strength > signal:
 
-            #        signal = m.signal_strength
-
-            #        strongest = m
+                    signal = m.signal_strength
+                    strongest = m
 
 
             if strongest:
@@ -753,9 +771,20 @@ class TBWorld:
 
                 )
 
+                if math.hypot(
+                    immune.x - strongest.x,
+                    immune.y - strongest.y
+                ) < 25:
+
+                    strongest.exhaustion += 0.01
+                    strongest.signal_strength += 0.01
+
+                    strongest.exhaustion = min(1.0, strongest.exhaustion)
+                    strongest.signal_strength = min(1.0, strongest.signal_strength)
+
                 if signal > 0.7:
 
-                    if random.random() < 0.003:
+                    if random.random() < 0.001:
 
                         self.macrophages.append(
 

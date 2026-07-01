@@ -108,7 +108,7 @@ class TBGRN:
             "growth": genome["growth_sensitivity"]
         }
 
-    def update(self, oxygen, drug=0.0, immune=0.0, nutrient=1.0):
+    def update(self, oxygen, drug=0.0, immune=0.0, nutrient=1.0, nitric_oxide=0.0):
 
         self.oxygen = oxygen
 
@@ -116,6 +116,7 @@ class TBGRN:
         self.inputs["drug"] = drug
         self.inputs["immune"] = immune
         self.inputs["nutrient"] = nutrient
+        self.inputs["nitric_oxide"] = nitric_oxide
 
         # ---------- Regulatory interactions ----------
 
@@ -144,6 +145,13 @@ class TBGRN:
                 )
 
             self.network.step(external)
+
+            for gene in self.genes.values():
+
+                gene.expression = max(
+                    0.0,
+                    min(1.0, gene.expression)
+                )
 
         self.regulators = {
 
@@ -204,29 +212,27 @@ class TBGRN:
 
         scores["ACTIVE"] = (
 
-            0.45 * p["growth_factor"]
-
-            + 0.30 * self.inputs["oxygen"]
-
-            + 0.25 * self.inputs["nutrient"]
+            0.60 * p["growth_factor"]
+            + 0.25 * self.inputs["oxygen"]
+            + 0.15 * self.inputs["nutrient"]
 
         )
 
         scores["DORMANT"] = (
 
-            0.50 * p["dormancy"]
+            0.55 * p["dormancy"]
             + 0.25 * (1 - self.inputs["oxygen"])
-            + 0.25 * p["persistence"]
+            + 0.20 * p["persistence"]
 
         )
 
         scores["STRESSED"] = (
 
-            0.40 * p["stress_tolerance"]
+            0.45 * p["stress_tolerance"]
 
             + 0.30 * self.inputs["drug"]
 
-            + 0.30 * self.inputs["immune"]
+            + 0.25 * self.inputs["immune"]
 
         )
 
@@ -258,11 +264,32 @@ class TBGRN:
 
         best_state = ordered[0][0]
 
+        if (
+            self.inputs["immune"] > 0.70
+            or self.inputs["drug"] > 0.70
+        ):
+            best_state = "STRESSED"
+
         if len(ordered) > 1:
 
             if ordered[0][1] - ordered[1][1] < 0.05:
 
                 best_state = self.last_state
+
+        if self.last_state == "DORMANT":
+
+    # Stay dormant while oxygen is still low
+            if self.inputs["oxygen"] < 0.45:
+
+                best_state = "DORMANT"
+
+            elif (
+                self.inputs["oxygen"] > 0.70
+                and
+                metabolism.atp > 0.40
+            ):
+
+                best_state = "REACTIVATING"
 
         self.last_scores = scores
 
@@ -277,35 +304,56 @@ class TBGRN:
 
         signal = 0.0
 
+        oxygen = self.inputs["oxygen"]
+        immune = self.inputs["immune"]
+        drug = self.inputs["drug"]
+        redox = self.inputs["redox"]
+
         if gene == "dosR":
 
-            signal += (
-                (1-self.inputs["oxygen"])
-                *TB_PARAMETERS["dosR_activation"]
-                *self.sensitivity["dosR"]
+            signal = (
+                0.6 * (1.0 - oxygen)
+                + 0.4 * self.inputs["nitric_oxide"]
+            )
+
+            signal *= (
+                TB_PARAMETERS["dosR_activation"]
+                * self.sensitivity["dosR"]
             )
 
         elif gene == "sigH":
 
-            signal += (
-                self.inputs["immune"]
-                *TB_PARAMETERS["sigH_activation"]
-                *self.sensitivity["stress"]
-            )
+            signal = (
+                0.9 * immune
+                + 0.1 * (1.0 - oxygen)
+            ) * TB_PARAMETERS["sigH_activation"]
 
         elif gene == "sigE":
 
-            signal += (
-                self.inputs["drug"]
-                *TB_PARAMETERS["sigE_activation"]
-                *self.sensitivity["stress"]
-            )
+            signal = (
+                0.7 * drug
+                + 0.3 * immune
+            ) * TB_PARAMETERS["sigE_activation"]
 
         elif gene == "whiB3":
 
-            signal += (
-                self.inputs["redox"]
-                *TB_PARAMETERS["whiB3_activation"]
+            signal = (
+                0.7 * redox
+                + 0.3 * (1.0 - oxygen)
+            ) * TB_PARAMETERS["whiB3_activation"]
+
+        elif gene == "mprA":
+
+            signal = (
+                0.5 * immune
+                + 0.5 * drug
+            )
+
+        elif gene == "phoP":
+
+            signal = (
+                0.7 * oxygen
+                + 0.3 * self.inputs["nutrient"]
             )
 
         return signal
@@ -326,7 +374,19 @@ class TBGRN:
 
         )
 
-        f["growth"] = self.sigmoid(growth_input)
+        energy_factor = (
+            0.2 * self.physiology["energy"]
+            + 0.8 * self.inputs["oxygen"]
+        )
+
+        f["growth"] = (
+            self.sigmoid(growth_input)
+            * energy_factor
+        )
+
+        drug_penalty = 1.0 - 0.30 * self.inputs["drug"]
+
+        f["growth"] *= max(0.0, drug_penalty)
 
         f["replication"] = f["growth"]
 
@@ -344,9 +404,9 @@ class TBGRN:
 
         r = self.regulators
 
-        f = self.functions
-
         p = self.physiology
+
+        f = self.functions
 
         p["metabolism"] = (
             0.7 * f["growth"]
@@ -354,8 +414,9 @@ class TBGRN:
         )
 
         p["energy"] = (
-            0.6 * p["metabolism"]
-            + 0.4 * self.inputs["nutrient"]
+            0.5 * p["metabolism"]
+            + 0.3 * self.inputs["nutrient"]
+            + 0.2 * self.inputs["oxygen"]
         )
 
         p["cell_wall"] = (

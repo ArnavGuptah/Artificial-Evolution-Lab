@@ -135,7 +135,7 @@ class Macrophage:
 
             )
 
-            self.signal_strength += 0.02
+            self.signal_strength += 0.05
 
             self.signal_strength = min(
 
