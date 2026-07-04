@@ -12,4 +12,4 @@ for source in grn:
 
     for target in grn[source]:
 
-        print(f"   {target}: {grn[source][target]:.3f}")
+        print(f" {target}: {grn[source][target]:.3f}")

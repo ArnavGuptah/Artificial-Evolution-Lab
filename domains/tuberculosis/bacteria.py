@@ -222,7 +222,18 @@ class Bacteria(Agent):
 
         )
 
-        child_genome["cppn"].mutate()
+        rate, sigma = world.speciation.mutation_rate(
+
+            child_genome["cppn"]
+
+        )
+
+        child_genome["cppn"].mutate(
+
+            mutation_rate=rate,
+            sigma=sigma
+
+        )
 
         decoder = HyperNEATDecoder(
 

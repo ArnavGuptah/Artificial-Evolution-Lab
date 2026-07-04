@@ -11,6 +11,7 @@ from domains.tuberculosis.tb_metabolism import TBMetabolism
 from domains.tuberculosis.tb_analytics import TBAnalytics
 from domains.tuberculosis.cytokine_field import CytokineField
 from domains.tuberculosis.camera import Camera
+from engine.hyperneat.speciation import SpeciationManager
 from configs.settings import (
 
     WORLD_WIDTH,
@@ -36,6 +37,8 @@ class TBWorld:
         self.config = config
 
         self.manager = manager
+
+        self.speciation = SpeciationManager()
 
         self.tick = 0
 
@@ -90,6 +93,12 @@ class TBWorld:
             "BestCPPNFitness",
 
             "AverageGRNWeight",
+
+            "Species",
+
+            "LargestSpecies",
+
+            "AverageSpeciesSize",
 
             "Generation",
 
@@ -664,6 +673,12 @@ class TBWorld:
 
                 self.debug_stats["average_grn_weight"],
 
+                self.debug_stats["species_count"],
+
+                self.debug_stats["largest_species"],
+
+                self.debug_stats["average_species_size"],
+
                 self.debug_stats["max_generation"],
 
                 self.debug_stats["living_lineages"]
@@ -1095,6 +1110,21 @@ class TBWorld:
         )
 
         print(
+            f"Species             : "
+            f"{self.debug_stats['species_count']}"
+        )
+
+        print(
+            f"Largest Species     : "
+            f"{self.debug_stats['largest_species']}"
+        )
+
+        print(
+            f"Average Species Size: "
+            f"{self.debug_stats['average_species_size']:.2f}"
+        )
+
+        print(
             f"Max Generation      : {self.debug_stats['max_generation']}"
         )
 
@@ -1129,6 +1159,11 @@ class TBWorld:
         print(
             f"Average GRN Weight  : "
             f"{self.debug_stats['average_grn_weight']:.3f}"
+        )
+
+        print(
+            f"Most Stagnant Species : "
+            f"{max((s.stagnation for s in self.speciation.species), default=0)}"
         )
 
         print("======================================\n")
@@ -1216,6 +1251,38 @@ class TBWorld:
     def compute_debug_stats(self):
 
         alive = [b for b in self.bacteria if b.state != Bacteria.DEAD]
+
+        self.speciation.clear()
+
+        for bacterium in alive:
+
+            cppn = bacterium.genome.get("cppn")
+
+            if cppn:
+
+                bacterium.species = self.speciation.assign(cppn)
+
+        species_count = len(self.speciation.species)
+
+        largest_species = max(
+
+            (len(s.members) for s in self.speciation.species),
+
+            default=0
+
+        )
+
+        average_species_size = (
+
+            sum(len(s.members) for s in self.speciation.species)
+
+            / species_count
+
+            if species_count
+
+            else 0
+
+        )
 
         cppn_fitness = []
         grn_weights = []
@@ -1575,6 +1642,15 @@ class TBWorld:
             "average_grn_weight":
                 sum(abs(w) for w in grn_weights) / len(grn_weights)
                 if grn_weights else 0,
+
+            "species_count":
+                species_count,
+
+            "largest_species":
+                largest_species,
+
+            "average_species_size":
+                average_species_size,
         }
 
             # Store history

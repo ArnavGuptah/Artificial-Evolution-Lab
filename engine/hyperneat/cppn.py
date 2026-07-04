@@ -6,7 +6,7 @@ class CPPN:
 
     def __init__(self):
 
-        self.hidden = 8
+        self.hidden = random.randint(6, 10)
 
         self.max_hidden = 32
 
@@ -57,6 +57,13 @@ class CPPN:
 
         self.id = random.randint(0, 1_000_000)
 
+        self.enabled = [
+
+            [True for _ in range(self.input_size)]
+            for _ in range(self.hidden)
+
+        ]
+
     def gaussian(self,x):
 
         return math.exp(-(x*x))
@@ -77,13 +84,15 @@ class CPPN:
 
         hidden = []
 
-        for neuron, bias in zip(self.w1, self.hidden_bias):
+        for i, (neuron, bias) in enumerate(zip(self.w1, self.hidden_bias)):
 
             s = bias
 
-            for w, x in zip(neuron, inputs):
+            for j, (w, x) in enumerate(zip(neuron, inputs)):
 
-                s += w * x
+                if self.enabled[i][j]:
+
+                    s += w * x
 
             activation = self.activations[len(hidden)]
 
@@ -206,6 +215,22 @@ class CPPN:
 
             ])
 
+        if random.random() < 0.02:
+
+            self.add_hidden_node()
+
+        self.mutate_connections()
+
+    def mutate_connections(self):
+
+        for i in range(self.hidden):
+
+            for j in range(self.input_size):
+
+                if random.random() < 0.01:
+
+                    self.enabled[i][j] = not self.enabled[i][j]
+
     def add_hidden_neuron(self):
 
         if self.hidden >= self.max_hidden:
@@ -241,3 +266,23 @@ class CPPN:
             ])
 
         )
+
+    def add_hidden_node(self):
+
+        self.hidden += 1
+
+        self.w1.append([
+
+            random.uniform(-1,1)
+
+            for _ in range(self.input_size)
+
+        ])
+
+        self.w2.append(random.uniform(-1,1))
+
+        self.hidden_bias.append( random.uniform(-1,1))
+
+        if self.hidden >= 24:
+
+            return
