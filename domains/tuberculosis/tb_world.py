@@ -85,6 +85,12 @@ class TBWorld:
 
             "AverageDosR",
 
+            "AverageCPPNFitness",
+
+            "BestCPPNFitness",
+
+            "AverageGRNWeight",
+
             "Generation",
 
             "LivingLineages"
@@ -652,6 +658,12 @@ class TBWorld:
 
                 self.validator.latest(self.observables.history,'average_dosR'),
 
+                self.debug_stats["average_cppn_fitness"],
+
+                self.debug_stats["best_cppn_fitness"],
+
+                self.debug_stats["average_grn_weight"],
+
                 self.debug_stats["max_generation"],
 
                 self.debug_stats["living_lineages"]
@@ -1104,6 +1116,21 @@ class TBWorld:
             f"{self.debug_stats['average_mutations']:.2f}"
         )
 
+        print(
+            f"Average CPPN Fitness: "
+            f"{self.debug_stats['average_cppn_fitness']:.3f}"
+        )
+
+        print(
+            f"Best CPPN Fitness   : "
+            f"{self.debug_stats['best_cppn_fitness']:.3f}"
+        )
+
+        print(
+            f"Average GRN Weight  : "
+            f"{self.debug_stats['average_grn_weight']:.3f}"
+        )
+
         print("======================================\n")
 
 
@@ -1189,6 +1216,31 @@ class TBWorld:
     def compute_debug_stats(self):
 
         alive = [b for b in self.bacteria if b.state != Bacteria.DEAD]
+
+        cppn_fitness = []
+        grn_weights = []
+
+        for b in alive:
+
+            cppn = b.genome.get("cppn")
+
+            if cppn:
+
+                cppn_fitness.append(cppn.fitness)
+
+            grn = b.genome.get("grn_weights", {})
+
+            for targets in grn.values():
+
+                for edge in targets.values():
+
+                    if isinstance(edge, dict):
+
+                        grn_weights.append(edge["weight"])
+
+                    else:
+
+                        grn_weights.append(edge)
 
         best = max(
             alive,
@@ -1511,6 +1563,18 @@ class TBWorld:
                     self.lineage_stats[b.id]["founder"]
                     for b in alive
                 }),
+
+            "average_cppn_fitness":
+                sum(cppn_fitness) / len(cppn_fitness)
+                if cppn_fitness else 0,
+
+            "best_cppn_fitness":
+                max(cppn_fitness)
+                if cppn_fitness else 0,
+
+            "average_grn_weight":
+                sum(abs(w) for w in grn_weights) / len(grn_weights)
+                if grn_weights else 0,
         }
 
             # Store history

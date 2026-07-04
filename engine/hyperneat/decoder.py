@@ -1,5 +1,6 @@
 from engine.hyperneat.substrate import Substrate
 from engine.hyperneat.cppn import CPPN
+from engine.hyperneat.innovation import innovation_tracker
 
 
 class HyperNEATDecoder:
@@ -20,7 +21,7 @@ class HyperNEATDecoder:
 
             inputs = self.substrate.cppn_inputs(source, target)
 
-            weight = self.cppn.forward(inputs)
+            weight = max(-1.0, min(1.0, self.cppn.forward(inputs)))
 
             grn[source][target] = weight
 

@@ -1,9 +1,11 @@
 import random
 import math
+from agents import genome
 from domains.tuberculosis.tb_parameters import TB_PARAMETERS
 from engine.grn.gene import Gene
 from engine.grn.connection import Connection
 from engine.grn.network import GRNNetwork
+from engine.hyperneat.decoder import HyperNEATDecoder
 
 class TBGRN:
 
@@ -39,26 +41,30 @@ class TBGRN:
 
             self.genes[name] = gene
 
+        decoder = HyperNEATDecoder(cppn=self.genome["cppn"])
+
+        self.genome["grn_weights"] = decoder.generate_grn()
+
         self.connections = []
 
         for source, targets in genome["grn_weights"].items():
 
-            for target, weight in targets.items():
+            for target, edge in targets.items():
 
                 if target not in self.genes:
                     continue
 
-                c = Connection(
+                connection = Connection(
                     self.genes[source],
                     self.genes[target],
-                    weight
+                    edge["weight"]
                 )
 
-                self.connections.append(c)
+                self.connections.append(connection)
 
-                self.genes[source].add_outgoing(c)
+                self.genes[source].add_outgoing(connection)
 
-                self.genes[target].add_incoming(c)  
+                self.genes[target].add_incoming(connection)  
 
         if len(self.connections) == 0:
 

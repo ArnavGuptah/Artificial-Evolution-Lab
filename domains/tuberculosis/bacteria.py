@@ -9,6 +9,8 @@ from domains.tuberculosis.tb_grn import TBGRN
 from domains.tuberculosis.tb_metabolism import TBMetabolism
 import copy
 from domains.tuberculosis.tb_grn_network import REGULATORY_NETWORK
+from engine.hyperneat.decoder import HyperNEATDecoder
+from engine.hyperneat.cppn import CPPN
 
 
 class Bacteria(Agent):
@@ -65,6 +67,8 @@ class Bacteria(Agent):
 
             "growth_sensitivity": random.uniform(0.8,1.2),
 
+            "cppn" : CPPN(),
+
             "grn_weights": {}
 
          }
@@ -75,13 +79,9 @@ class Bacteria(Agent):
 
         if not self.genome["grn_weights"]:
 
-            for source, targets in REGULATORY_NETWORK.items():
+            decoder = HyperNEATDecoder(cppn=self.genome["cppn"])
 
-                self.genome["grn_weights"][source] = {}
-
-                for target in targets:
-
-                    self.genome["grn_weights"][source][target] = random.uniform(-1.0,1.0)
+            self.genome["grn_weights"] = decoder.generate_grn()
 
         self.state = "ACTIVE"
 
@@ -216,6 +216,22 @@ class Bacteria(Agent):
 
         )
 
+        child_genome["cppn"] = copy.deepcopy(
+
+            self.genome["cppn"]
+
+        )
+
+        child_genome["cppn"].mutate()
+
+        decoder = HyperNEATDecoder(
+
+            cppn=child_genome["cppn"]
+
+        )
+
+        child_genome["grn_weights"] = decoder.generate_grn()
+
         self.energy -= self.config["bacteria"]["birth_energy_cost"]
 
         if self.energy <= 0:
@@ -233,9 +249,6 @@ class Bacteria(Agent):
             config=self.config
 
         )
-
-        GRNMutation.mutate_connections(child.grn.connections)
-
         child.parent_id = self.id
 
         child.generation = (self.generation + 1)
@@ -258,13 +271,12 @@ class Bacteria(Agent):
 
         for gene in self.genome:
 
-            if gene == "grn_weights":
+            if gene in ("grn_weights", "cppn"):
                 continue
 
             old = self.genome[gene]
 
             new = child.genome[gene]
-
 
             if abs(new - old) > 0.05:
 
@@ -461,6 +473,10 @@ class Bacteria(Agent):
             0.20 * self.metabolism.atp
 
         )
+
+        self.genome["cppn"].fitness = self.fitness
+
+        self.genome["cppn"].age += 1
 
     @property
 

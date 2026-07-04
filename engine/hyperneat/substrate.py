@@ -39,25 +39,25 @@ class Substrate:
 
         return pairs
 
-def distance(self, a, b):
+    def distance(self, a, b):
 
-    x1, y1 = self.position(a)
+        x1, y1 = self.position(a)
 
-    x2, y2 = self.position(b)
+        x2, y2 = self.position(b)
 
-    return math.sqrt(
+        return math.sqrt(
 
-        (x2 - x1) ** 2 +
+            (x2 - x1) ** 2 +
 
-        (y2 - y1) ** 2
-    )
+            (y2 - y1) ** 2
+        )
 
-def cppn_inputs(self, source, target):
+    def cppn_inputs(self, source, target):
 
-    x1, y1 = self.position(source)
+        x1, y1 = self.position(source)
 
-    x2, y2 = self.position(target)
+        x2, y2 = self.position(target)
 
-    d = self.distance(source, target)
+        d = self.distance(source, target)
 
-    return [x1, y1, x2, y2, d, 1.0]
+        return [x1, y1, x2, y2, d, 1.0]
