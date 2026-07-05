@@ -12,20 +12,16 @@ from domains.tuberculosis.tb_analytics import TBAnalytics
 from domains.tuberculosis.cytokine_field import CytokineField
 from domains.tuberculosis.camera import Camera
 from engine.hyperneat.speciation import SpeciationManager
-from configs.settings import (
-
-    WORLD_WIDTH,
-
-    WORLD_HEIGHT,
-
-    FPS
-
-)
+from configs.settings import (WORLD_WIDTH, WORLD_HEIGHT, FPS)
 from domains.tuberculosis.macrophage import Macrophage
 from domains.tuberculosis.bacteria import Bacteria
 from domains.tuberculosis.tb_renderer import TBRenderer
 from domains.tuberculosis.tb_validator import TBValidator
 from domains.tuberculosis.tb_calibration import TBCalibration
+from engine.pareto import ParetoOptimizer
+from engine.novelty import NoveltySearch
+from engine.novelty import novelty_archive
+
 import time
 
 class TBWorld:
@@ -102,7 +98,17 @@ class TBWorld:
 
             "Generation",
 
-            "LivingLineages"
+            "LivingLineages",
+
+            "AverageNovelty",
+
+            "NoveltyArchiveSize",
+
+            "ParetoFronts",
+
+            "BestFrontSize",
+            
+            "AverageParetoRank"
 
         ])
 
@@ -533,8 +539,15 @@ class TBWorld:
 
         MAX_BACTERIA = 2000
 
-        if len(self.bacteria) < MAX_BACTERIA:
-            self.bacteria.extend(new_bacteria)
+        self.bacteria.extend(new_bacteria)
+
+        if len(self.bacteria) > MAX_BACTERIA:
+
+            from evolution.selection import Selection
+
+            self.bacteria = Selection.sort(self.bacteria)
+
+            self.bacteria = self.bacteria[:MAX_BACTERIA]
 
         macrophage_added = len(new_bacteria)
 
@@ -1252,6 +1265,16 @@ class TBWorld:
 
         alive = [b for b in self.bacteria if b.state != Bacteria.DEAD]
 
+        ParetoOptimizer.rank(alive)
+
+        NoveltySearch.score(alive)
+
+        pareto_fronts = ParetoOptimizer.fronts(alive)
+
+        for front in pareto_fronts.values():
+
+            ParetoOptimizer.crowding_distance(front)
+
         self.speciation.clear()
 
         for bacterium in alive:
@@ -1314,6 +1337,53 @@ class TBWorld:
             key=lambda b: b.fitness,
             default=None
         )
+
+        growth_objective = 0.0
+
+        survival_objective = 0.0
+
+        persistence_objective = 0.0
+
+        drug_objective = 0.0
+
+        energy_objective = 0.0
+
+        for bacterium in alive:
+
+            obj = getattr(bacterium, "objectives", {
+
+                "growth": 0.0,
+                "survival": 0.0,
+                "persistence": 0.0,
+                "drug_tolerance": 0.0,
+                "energy_efficiency": 0.0
+
+            })
+
+            growth_objective += obj["growth"]
+
+            survival_objective += obj["survival"]
+
+            persistence_objective += obj["persistence"]
+
+            drug_objective += obj["drug_tolerance"]
+
+            energy_objective += obj["energy_efficiency"]
+
+        if not alive:
+            return
+
+        count = max(1, len(alive))
+
+        growth_objective /= count
+
+        survival_objective /= count
+
+        persistence_objective /= count
+
+        drug_objective /= count
+
+        energy_objective /= count
 
         active = 0
 
@@ -1651,6 +1721,55 @@ class TBWorld:
 
             "average_species_size":
                 average_species_size,
+
+            "average_growth_objective":
+                growth_objective,
+
+            "average_survival_objective":
+                survival_objective,
+
+            "average_persistence_objective":
+                persistence_objective,
+
+            "average_drug_objective":
+                drug_objective,
+
+            "average_energy_objective":
+                energy_objective,
+
+            "pareto_fronts":
+                len(pareto_fronts),
+
+            "best_front_size":
+                len(pareto_fronts.get(0, [])),
+
+            "average_pareto_rank":
+
+                sum(
+                    b.pareto_rank
+                    for b in alive
+                ) / N,
+
+            "average_crowding_distance":
+
+                sum(
+                    0.0
+                    if math.isinf(b.crowding_distance)
+                    else b.crowding_distance
+                    for b in alive
+                ) / N,
+
+            "average_novelty":
+
+                sum(
+                    b.novelty
+                    for b in alive
+                ) / N,
+
+            "novelty_archive_size":
+
+                len(novelty_archive.archive),
+
         }
 
             # Store history

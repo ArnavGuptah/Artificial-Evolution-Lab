@@ -103,6 +103,14 @@ class Bacteria(Agent):
 
         self.founder_id = self.id
 
+        self.pareto_rank = 0
+
+        self.crowding_distance = 0.0
+
+        self.behaviour = {}
+
+        self.novelty = 0.0
+
         self.lineage_color = (
 
             random.randint(50,255),
@@ -471,17 +479,61 @@ class Bacteria(Agent):
         if self.energy <= 0:
             self.state = Bacteria.DEAD
 
-        diversity_bonus = random.uniform(0.95, 1.05)
+# ---------- Evolutionary Objectives ----------
+
+        self.objectives = {
+
+            "growth":
+
+                self.grn.current_phenotype["growth_factor"],
+
+            "survival":
+
+                self.metabolism.cell_health,
+
+            "persistence":
+
+                self.grn.current_phenotype["persistence"],
+
+            "drug_tolerance":
+
+                self.grn.current_phenotype["drug_efflux"],
+
+            "energy_efficiency":
+
+                self.energy / 100.0
+
+        }
+
+        self.behaviour = {
+
+            "growth":
+                self.objectives["growth"],
+
+            "persistence":
+                self.objectives["persistence"],
+
+            "drug":
+                self.objectives["drug_tolerance"],
+
+            "energy":
+                self.objectives["energy_efficiency"],
+
+            "dosR":
+                self.grn.regulators["dosR"]
+
+        }
+
+        # Temporary weighted fitness
+        # (Later replaced by Pareto ranking)
 
         self.fitness = (
 
-            0.30 * self.energy
-            +
-            0.30 * self.grn.current_phenotype["growth_factor"]
-            +
-            0.20 * self.metabolism.cell_health
-            +
-            0.20 * self.metabolism.atp
+            0.25 * self.objectives["growth"]
+            + 0.25 * self.objectives["survival"]
+            + 0.20 * self.objectives["persistence"]
+            + 0.15 * self.objectives["drug_tolerance"]
+            + 0.15 * self.objectives["energy_efficiency"]
 
         )
 

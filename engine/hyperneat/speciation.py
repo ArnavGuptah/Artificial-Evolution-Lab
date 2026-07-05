@@ -109,6 +109,8 @@ class SpeciationManager:
 
         )
 
+        cppn.species_id = new_species.id
+
         new_species.add(cppn)
 
         self.species.append(new_species)
@@ -120,6 +122,8 @@ class SpeciationManager:
         for species in self.species:
 
             species.update_representative()
+
+            species.update_progress()
 
             species.members.clear()
 
