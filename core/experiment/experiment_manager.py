@@ -5,43 +5,50 @@ import time
 import platform
 import hashlib
 import sys
+import os
 from datetime import datetime
-
 
 class ExperimentManager:
 
-    def __init__(self, config = None):
+    def __init__(self, experiment_name, config):
+
+        self.name = experiment_name
 
         self.config = config
 
-        self.name = config["experiment"]["name"]
+        base = Path("experiments") / experiment_name
 
-        self.root = (
-
-            Path("experiments")
-
-            /
-
-            self.name
-
-        )
-
-    def prepare(self):
-
-        if self.root.exists():
-
-            shutil.rmtree(
-
-                self.root
-
-            )
-
-        self.root.mkdir(
+        base.mkdir(
 
             parents=True,
 
             exist_ok=True
 
+        )
+
+        existing = [
+
+            d for d in base.iterdir()
+
+            if d.is_dir()
+
+            and d.name.startswith("run_")
+
+        ]
+
+        run_number = len(existing) + 1
+
+        self.root = base / f"run_{run_number:03d}"
+
+    def prepare(self):
+
+        if self.root.exists():
+
+            shutil.rmtree(self.root)
+
+        self.root.mkdir(
+            parents=True,
+            exist_ok=True
         )
 
     def path(self, filename):
@@ -50,27 +57,9 @@ class ExperimentManager:
     
     def save_config(self):
 
-        with open(
+        with open(self.path("config.json"), "w") as f:
 
-            self.path(
-
-                "config.json"
-
-            ),
-
-            "w"
-
-        ) as f:
-
-            json.dump(
-
-                self.config.data,
-
-                f,
-
-                indent=4
-
-            )
+            json.dump(self.config.data, f, indent=4)
 
     def save_metadata(self):
 

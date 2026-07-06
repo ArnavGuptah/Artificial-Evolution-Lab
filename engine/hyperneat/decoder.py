@@ -23,6 +23,8 @@ class HyperNEATDecoder:
 
             weight = max(-1.0, min(1.0, self.cppn.forward(inputs)))
 
-            grn[source][target] = weight
+            innovation = innovation_tracker.connection_id(source, target)
+
+            grn[source][target] = {"weight": weight, "innovation": innovation}
 
         return grn

@@ -34,6 +34,10 @@ class TBWorld:
 
         self.manager = manager
 
+        self.manager.save_config()
+
+        self.manager.save_metadata()
+
         self.speciation = SpeciationManager()
 
         self.tick = 0
@@ -107,7 +111,7 @@ class TBWorld:
             "ParetoFronts",
 
             "BestFrontSize",
-            
+
             "AverageParetoRank"
 
         ])
@@ -2222,6 +2226,58 @@ class TBWorld:
         TBCalibration.report(self)
 
         self.validate_biology()
+
+        summary = {
+
+            "runtime_seconds":
+
+                round(
+
+                    time.time() - self.start_time,
+
+                    2
+
+                ),
+
+            "final_population":
+
+                self.debug_stats["population"],
+
+            "peak_population":
+
+                self.debug_stats["peak_population"],
+
+            "total_births":
+
+                self.total_births,
+
+            "total_deaths":
+
+                self.total_deaths,
+
+            "species":
+
+                self.debug_stats["species_count"],
+
+            "largest_species":
+
+                self.debug_stats["largest_species"],
+
+            "pareto_fronts":
+
+                self.debug_stats["pareto_fronts"],
+
+            "best_front_size":
+
+                self.debug_stats["best_front_size"],
+
+            "average_novelty":
+
+                self.debug_stats["average_novelty"]
+
+        }
+
+        self.manager.save_summary(summary)
 
     def validate_biology(self):
 

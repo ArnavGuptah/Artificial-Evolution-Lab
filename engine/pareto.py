@@ -7,15 +7,18 @@ class ParetoOptimizer:
 
         strictly_better = False
 
-        for key in a.objectives:
+        objectives_a = getattr(a, "objectives", {})
+        objectives_b = getattr(b, "objectives", {})
 
-            if a.objectives[key] < b.objectives[key]:
+        for key in objectives_a:
+
+            if objectives_a[key] < objectives_b[key]:
 
                 better_or_equal = False
 
                 break
 
-            elif a.objectives[key] > b.objectives[key]:
+            elif objectives_a[key] > objectives_b[key]:
 
                 strictly_better = True
 

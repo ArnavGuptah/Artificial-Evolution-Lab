@@ -235,9 +235,7 @@ class TBGRN:
         scores["STRESSED"] = (
 
             0.45 * p["stress_tolerance"]
-
             + 0.30 * self.inputs["drug"]
-
             + 0.25 * self.inputs["immune"]
 
         )
@@ -245,9 +243,7 @@ class TBGRN:
         scores["REACTIVATING"] = (
 
             0.50 * p["growth_factor"]
-
             + 0.30 * self.inputs["oxygen"]
-
             + 0.20 * (1 - p["dormancy"])
 
         )

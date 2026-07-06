@@ -1,24 +1,63 @@
 import math
 
+class NoveltyArchive:
+
+    def __init__(self):
+
+        self.archive = []
+
+    def add(self, bacterium):
+
+        if hasattr(bacterium, "behaviour"):
+
+            self.archive.append(bacterium.behaviour.copy())
+
+        else:
+
+            self.archive.append(bacterium.copy())
+
+    def sample(self):
+
+        return self.archive
+    
+novelty_archive = NoveltyArchive()
 
 class NoveltySearch:
 
     @staticmethod
     def distance(a, b):
 
+        behaviour_a = (
+
+            a.behaviour
+
+            if hasattr(a, "behaviour")
+
+            else a
+
+        )
+
+        behaviour_b = (
+
+            b.behaviour
+
+            if hasattr(b, "behaviour")
+
+            else b
+
+        )
+
+        all_keys = set(behaviour_a.keys()) | set(behaviour_b.keys())
+
         d = 0.0
 
-        for key in a.behaviour:
+        for key in behaviour_a:
 
-            d += (
+            value_a = behaviour_a.get(key, 0.0)
 
-                a.behaviour[key]
+            value_b = behaviour_b.get(key, 0.0)
 
-                -
-
-                b.behaviour[key]
-
-            ) ** 2
+            d += (value_a - value_b) ** 2
 
         return math.sqrt(d)
     
@@ -29,7 +68,10 @@ class NoveltySearch:
 
             distances = []
 
-            comparison = population + novelty_archive.sample()
+            comparison = population + [
+                b for b in novelty_archive.sample()
+                if b
+            ]
 
             for other in comparison:
 
@@ -39,15 +81,7 @@ class NoveltySearch:
 
                 distances.append(
 
-                    NoveltySearch.distance(
-
-                        bacterium,
-
-                        other
-
-                    )
-
-                )
+                    NoveltySearch.distance(bacterium, other))
 
             distances.sort()
 
@@ -72,17 +106,3 @@ class NoveltySearch:
             if bacterium.novelty > 0.75:
 
                 novelty_archive.add(bacterium)
-
-class NoveltyArchive:
-
-    def __init__(self):
-
-        self.archive = []
-
-    def add(self, bacterium):
-
-        self.archive.append(bacterium)
-
-    def sample(self):
-
-        return self.archive

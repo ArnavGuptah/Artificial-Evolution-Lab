@@ -6,6 +6,10 @@ class ConfigLoader:
 
     def __init__(self, domain, config):
 
+        self.domain = domain
+        
+        self.name = config
+
         folder = Path(__file__).parent / domain
 
         baseline = folder / "baseline.json"

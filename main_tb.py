@@ -17,13 +17,9 @@ def main():
         experiments = [
 
             "baseline",
-
             "hypoxia",
-
             "hyperoxia",
-
             "treatment",
-
             "immune_high"
 
         ]
@@ -68,7 +64,7 @@ def run_experiment(config_name):
         config_name
     )
 
-    manager = ExperimentManager(config)
+    manager = ExperimentManager(config_name, config)
 
     manager.prepare()
 

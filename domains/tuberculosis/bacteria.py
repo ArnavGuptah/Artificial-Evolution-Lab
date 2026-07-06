@@ -107,6 +107,14 @@ class Bacteria(Agent):
 
         self.crowding_distance = 0.0
 
+        self.objectives = {
+            "growth": 0.0,
+            "survival": 0.0,
+            "persistence": 0.0,
+            "drug_tolerance": 0.0,
+            "energy_efficiency": 0.0
+        }
+
         self.behaviour = {}
 
         self.novelty = 0.0
