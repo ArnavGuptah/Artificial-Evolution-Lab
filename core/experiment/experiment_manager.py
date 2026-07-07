@@ -101,6 +101,26 @@ class ExperimentManager:
 
             )
 
+    def save_summary(self, summary):
+
+        with open(
+
+            self.path("summary.json"),
+
+            "w"
+
+        ) as f:
+
+            json.dump(
+
+                summary,
+
+                f,
+
+                indent=4
+
+            )
+
     def log_path(self):
 
         return self.path("tb_log.txt")
