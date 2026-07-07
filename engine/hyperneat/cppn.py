@@ -122,27 +122,29 @@ class CPPN:
 
         return self.tanh(output)
 
-    def mutate(self):
+    def mutate(self, mutation_rate=None, sigma=None):
 
-        if self.fitness > 18:
+        if mutation_rate is None or sigma is None:
 
-            mutation_rate = 0.04
-            sigma = 0.08
+            if self.fitness > 18:
 
-        elif self.fitness > 12:
+                mutation_rate = 0.04
+                sigma = 0.08
 
-            mutation_rate = 0.08
-            sigma = 0.15
+            elif self.fitness > 12:
 
-        else:
+                mutation_rate = 0.08
+                sigma = 0.15
 
-            mutation_rate = 0.15
-            sigma = 0.25
+            else:
 
-        if self.age > 3000:
+                mutation_rate = 0.15
+                sigma = 0.25
 
-            mutation_rate *= 0.75
-            sigma *= 0.75
+            if self.age > 3000:
+
+                mutation_rate *= 0.75
+                sigma *= 0.75
 
     # Mutate input → hidden weights
         for i in range(self.hidden):
@@ -269,20 +271,42 @@ class CPPN:
 
     def add_hidden_node(self):
 
+        if self.hidden >= self.max_hidden:
+            return
+
         self.hidden += 1
 
         self.w1.append([
 
-            random.uniform(-1,1)
+            random.uniform(-1, 1)
 
             for _ in range(self.input_size)
 
         ])
 
-        self.w2.append(random.uniform(-1,1))
+        self.w2.append(
+            random.uniform(-1, 1)
+        )
 
-        self.hidden_bias.append( random.uniform(-1,1))
+        self.hidden_bias.append(
+            random.uniform(-1, 1)
+        )
 
-        if self.hidden >= 24:
+        self.activations.append(
 
-            return
+            random.choice([
+
+                "gaussian",
+                "sine",
+                "tanh",
+                "sigmoid"
+
+            ])
+
+        )
+
+        self.enabled.append(
+
+            [True for _ in range(self.input_size)]
+
+        )

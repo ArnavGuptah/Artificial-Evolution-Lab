@@ -168,7 +168,19 @@ class Bacteria(Agent):
         ):
             return None
 
-        fitness_factor = min(2.0, self.fitness / 15.0)
+        alive = [
+
+            b for b in world.bacteria
+
+            if b.state != Bacteria.DEAD
+
+        ]
+
+        best = max((b.fitness for b in alive), default=1.0)
+
+        best = max(best, 0.01)
+
+        fitness_factor = min(2.0, self.fitness / best)
 
         probability = (
             self.genome["replication_rate"]
@@ -176,7 +188,9 @@ class Bacteria(Agent):
             * fitness_factor
         )
 
-        probability = max(0.0, min(probability, 0.15))
+        probability = max(probability, 0.003 )
+
+        probability = min(probability, 0.15)
 
         # Don't allow severely damaged bacteria to replicate
         if self.metabolism.cell_health < 0.30:
@@ -212,6 +226,35 @@ class Bacteria(Agent):
         )
 
         probability *= density_factor
+
+        if world.tick % 500 == 0:
+
+            print(
+                f"[REPRO] "
+                f"id={self.id} "
+                f"prob={probability:.5f} "
+                f"fit={self.fitness:.3f} "
+                f"growth={self.grn.current_phenotype['growth_factor']:.3f} "
+                f"O2={oxygen:.3f}"
+            )
+
+        if world.tick % 200 == 0:
+
+            print(
+
+                f"[Reproduction] "
+
+                f"id={self.id} "
+
+                f"prob={probability:.5f} "
+
+                f"fit={self.fitness:.2f} "
+
+                f"growth={self.grn.current_phenotype['growth_factor']:.2f} "
+
+                f"O2={oxygen:.2f}"
+
+            )
 
         if random.random() > probability:
 

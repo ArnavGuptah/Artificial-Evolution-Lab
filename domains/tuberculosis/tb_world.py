@@ -422,11 +422,29 @@ class TBWorld:
 
             child = b.reproduce(self)
 
+            if child:
+
+                print(
+                    f"[BIRTH] "
+                    f"tick={self.tick} "
+                    f"{b.id}->{child.id}"
+                )
+
+            if child:
+                print(
+                    f"[SUCCESS] Tick={self.tick} Parent={b.id} Child={child.id}"
+                )
+
             if (
                 child
                 and child.grn.regulators["dosR"] < 0.02
                 and child.grn.regulators["sigH"] < 0.02
             ):
+                
+                print(
+                    "[Rejected newborn]",
+                    child.id
+                )
 
                 continue
 

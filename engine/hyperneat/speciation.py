@@ -67,23 +67,29 @@ class SpeciationManager:
 
         self.species = []
 
-        self.compatibility_threshold = 2.5
+        self.compatibility_threshold = 0.35
 
     def distance(self, cppn1, cppn2):
 
-        d = 0.0
+        diff = 0.0
+        count = 0
 
         for row1, row2 in zip(cppn1.w1, cppn2.w1):
 
             for a, b in zip(row1, row2):
 
-                d += abs(a - b)
+                diff += abs(a - b)
+                count += 1
 
         for a, b in zip(cppn1.w2, cppn2.w2):
 
-            d += abs(a - b)
+            diff += abs(a - b)
+            count += 1
 
-        return d
+        if count == 0:
+            return 0.0
+
+        return diff / count
         
     def assign(self, cppn):
 
@@ -93,6 +99,12 @@ class SpeciationManager:
 
                 cppn,
                 species.representative
+            )
+
+            print(
+                f"[Species] "
+                f"distance={d:.3f} "
+                f"threshold={self.compatibility_threshold:.3f}"
             )
 
             if d < self.compatibility_threshold:
