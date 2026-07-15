@@ -69,6 +69,8 @@ class SpeciationManager:
 
         self.compatibility_threshold = 0.35
 
+        self.target_species = 20
+
     def distance(self, cppn1, cppn2):
 
         diff = 0.0
@@ -131,13 +133,24 @@ class SpeciationManager:
     
     def clear(self):
 
+        survivors = []
+
         for species in self.species:
 
             species.update_representative()
-
             species.update_progress()
-
             species.members.clear()
+
+            if species.stagnation < 20:
+                survivors.append(species)
+
+        self.species = survivors
+
+        self.species = [
+        s
+        for s in self.species
+        if s.representative is not None
+    ]
 
     def mutation_rate(self, cppn):
 
@@ -145,10 +158,9 @@ class SpeciationManager:
 
         for s in self.species:
 
-            if cppn in s.members:
+            if s.id == cppn.species_id:
 
                 species = s
-
                 break
 
         if species is None:
@@ -158,7 +170,6 @@ class SpeciationManager:
         fitness = species.average_fitness()
 
         mutation_rate = 0.10
-
         sigma = 0.20
 
         if fitness > 18:
@@ -176,8 +187,6 @@ class SpeciationManager:
             mutation_rate = 0.18
             sigma = 0.35
 
-        # ---- Species has stopped improving ----
-
         if species.stagnation > 10:
 
             mutation_rate *= 1.5
@@ -187,3 +196,20 @@ class SpeciationManager:
         sigma = min(sigma, 0.50)
 
         return mutation_rate, sigma
+
+    def adapt_threshold(self):
+
+        count = len(self.species)
+
+        if count > self.target_species:
+
+            self.compatibility_threshold += 0.01
+
+        elif count < self.target_species:
+
+            self.compatibility_threshold -= 0.01
+
+        self.compatibility_threshold = max(
+            0.15,
+            min(1.0, self.compatibility_threshold)
+        )

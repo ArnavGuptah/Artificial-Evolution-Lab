@@ -1,0 +1,12 @@
+{
+    "runtime_seconds": 70.11,
+    "final_population": 103,
+    "peak_population": 125,
+    "total_births": 0,
+    "total_deaths": 271,
+    "species": 374,
+    "largest_species": 1,
+    "pareto_fronts": 20,
+    "best_front_size": 45,
+    "average_novelty": 0.08417924922232985
+}

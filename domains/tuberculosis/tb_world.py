@@ -21,14 +21,16 @@ from domains.tuberculosis.tb_calibration import TBCalibration
 from engine.pareto import ParetoOptimizer
 from engine.novelty import NoveltySearch
 from engine.novelty import novelty_archive
-
 import time
+from evolution.classical_strategy import ClassicalStrategy
 
 class TBWorld:
 
     def __init__(self, config, manager):
 
         super().__init__()
+
+        self.evolution = ClassicalStrategy()
 
         self.config = config
 
@@ -857,7 +859,7 @@ class TBWorld:
                                 strongest.y + random.randint(-40,40)
 
                             )
-
+ 
                         )
 
         self.camera.update()
