@@ -67,7 +67,7 @@ class SpeciationManager:
 
         self.species = []
 
-        self.compatibility_threshold = 0.35
+        self.compatibility_threshold = 1.0
 
         self.target_species = 20
 
@@ -96,6 +96,9 @@ class SpeciationManager:
     def assign(self, cppn):
 
         for species in self.species:
+
+            if species.representative is None:
+                continue
 
             d = self.distance(
 

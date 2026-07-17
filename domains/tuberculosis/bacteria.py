@@ -25,7 +25,6 @@ class Bacteria(Agent):
 
     DEAD = "DEAD"
 
-
     def __init__(self, x, y, genome=None, config=None):
 
         super().__init__()
@@ -166,7 +165,11 @@ class Bacteria(Agent):
             Bacteria.ACTIVE,
             Bacteria.REACTIVATING
         ):
+
+            world.repro_fail_state += 1
             return None
+
+        world.reproduction_attempts += 1
 
         alive = [
 
@@ -188,12 +191,13 @@ class Bacteria(Agent):
             * fitness_factor
         )
 
-        probability = max(probability, 0.003 )
+        probability = max(probability, 0.01)
 
         probability = min(probability, 0.15)
 
         # Don't allow severely damaged bacteria to replicate
         if self.metabolism.cell_health < 0.30:
+            world.repro_fail_health += 1
             return None
 
         fitness_cost = (
@@ -212,7 +216,7 @@ class Bacteria(Agent):
 
         oxygen = self.grn.inputs["oxygen"]
 
-        probability *= oxygen
+        probability *= max(0.5, oxygen)
 
         neighbors = world.bacteria_near(
             self.x,
@@ -256,23 +260,23 @@ class Bacteria(Agent):
 
             )
 
-        if random.random() > probability:
+        roll = random.random()
 
-            if self.fitness < 8:
+        if roll > probability:
 
+            world.repro_fail_probability += 1
+
+            if self.fitness < 0.40:
                 self.energy -= 0.2
 
                 if self.energy <= 0:
-
                     self.state = Bacteria.DEAD
 
             return None
 
-        child_genome = gaussian_mutate(
-
+        child_genome = world.mutation_strategy.mutate_genome(
             self.genome,
             TB_GENE_BOUNDS
-
         )
 
         child_genome["cppn"] = copy.deepcopy(
@@ -281,17 +285,9 @@ class Bacteria(Agent):
 
         )
 
-        rate, sigma = world.speciation.mutation_rate(
-
-            child_genome["cppn"]
-
-        )
-
-        child_genome["cppn"].mutate(
-
-            mutation_rate=rate,
-            sigma=sigma
-
+        world.mutation_strategy.mutate_cppn(
+            child_genome["cppn"],
+            world.speciation
         )
 
         decoder = HyperNEATDecoder(
@@ -319,6 +315,9 @@ class Bacteria(Agent):
             config=self.config
 
         )
+
+        child.species = world.speciation.assign(child.genome["cppn"])
+
         child.parent_id = self.id
 
         child.generation = (self.generation + 1)
@@ -357,13 +356,20 @@ class Bacteria(Agent):
                     }
                 )
 
-        if self.fitness < 8:
+        if self.fitness < 0.40:
 
             self.energy -= 0.2
 
             if self.energy <= 0:
 
                 self.state = Bacteria.DEAD
+
+        print(
+            f"[SUCCESSFUL BIRTH] "
+            f"Parent={self.id} "
+            f"Child={child.id} "
+            f"Generation={child.generation}"
+        )
 
         return child
 
@@ -425,14 +431,14 @@ class Bacteria(Agent):
 
         if self.state == Bacteria.DORMANT:
 
-            self.metabolism.atp += 0.01
+            self.metabolism.atp += 0.003 * oxygen
 
         else:
 
             self.metabolism.atp -= 0.005
 
         self.metabolism.atp = max(
-            0.0,
+            0.05,
             min(1.0, self.metabolism.atp)
         )
 

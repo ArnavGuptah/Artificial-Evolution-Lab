@@ -23,6 +23,7 @@ from engine.novelty import NoveltySearch
 from engine.novelty import novelty_archive
 import time
 from evolution.classical_strategy import ClassicalStrategy
+from evolution.gaussian_mutation import GaussianMutationStrategy
 
 class TBWorld:
 
@@ -30,11 +31,23 @@ class TBWorld:
 
         super().__init__()
 
+        self.mutation_strategy = GaussianMutationStrategy()
+
         self.evolution = ClassicalStrategy()
 
         self.config = config
 
         self.manager = manager
+
+        self.repro_fail_state = 0
+
+        self.repro_fail_health = 0
+
+        self.repro_fail_probability = 0
+
+        self.reproduction_attempts = 0
+
+        self.successful_births = 0
 
         self.manager.save_config()
 
@@ -47,6 +60,8 @@ class TBWorld:
         self.total_births = 0
 
         self.total_deaths = 0
+
+        self.reproduction_attempts = 0
 
         self.first_dormancy_tick = None
 
@@ -73,48 +88,31 @@ class TBWorld:
         self.csv_writer.writerow([
 
             "Tick",
-
             "Population",
-
             "Active%",
-
             "Dormant%",
-
             "Stress%",
-
             "AverageFitness",
-
             "AverageATP",
-
             "AverageGrowth",
-
             "AverageDosR",
-
             "AverageCPPNFitness",
-
             "BestCPPNFitness",
-
             "AverageGRNWeight",
-
             "Species",
-
             "LargestSpecies",
-
             "AverageSpeciesSize",
-
             "Generation",
-
             "LivingLineages",
-
             "AverageNovelty",
-
             "NoveltyArchiveSize",
-
             "ParetoFronts",
-
             "BestFrontSize",
-
-            "AverageParetoRank"
+            "AverageParetoRank",
+            "ReproductionAttempts",
+            "SuccessfulBirths",
+            "Births",
+            "Deaths",
 
         ])
 
@@ -263,7 +261,7 @@ class TBWorld:
 
             )
 
-    
+            b.species = self.speciation.assign(b.genome["cppn"])
 
             self.lineage_stats[b.id] = {
                 "founder": b.id,
@@ -294,22 +292,9 @@ class TBWorld:
 
                 Macrophage(
 
-                    random.randint(
+                    random.randint(0, WORLD_WIDTH),
 
-                        0,
-
-                        WORLD_WIDTH
-
-                    ),
-
-                    random.randint(
-
-                        0,
-
-                        WORLD_HEIGHT
-
-                    )
-
+                    random.randint(0, WORLD_HEIGHT)
                 )
             )
 
@@ -322,6 +307,8 @@ class TBWorld:
         new_granuloma_bacteria = self.update_granulomas()
 
         self.bacteria.extend(new_granuloma_bacteria)
+
+        self.total_births += len(new_granuloma_bacteria)
 
         granuloma_added = len(new_granuloma_bacteria)
 
@@ -422,47 +409,25 @@ class TBWorld:
 
                 continue
 
+            self.reproduction_attempts += 1
+
             child = b.reproduce(self)
 
-            if child:
+            if child is not None:
 
-                print(
-                    f"[BIRTH] "
-                    f"tick={self.tick} "
-                    f"{b.id}->{child.id}"
-                )
+                print(f"[BIRTH SUCCESS] tick={self.tick} parent={b.id} child={child.id}")
 
-            if child:
-                print(
-                    f"[SUCCESS] Tick={self.tick} Parent={b.id} Child={child.id}"
-                )
-
-            if (
-                child
-                and child.grn.regulators["dosR"] < 0.02
-                and child.grn.regulators["sigH"] < 0.02
-            ):
-                
-                print(
-                    "[Rejected newborn]",
-                    child.id
-                )
-
-                continue
-
-            if child:
-                
-                births += 1
-                reproduction_added += 1
+                self.successful_births += 1
                 self.total_births += 1
+
                 newborns.append(child)
 
+                births += 1
+                reproduction_added += 1
+
                 self.lineages[child.id] = {
-
                     "parent": b.id,
-
                     "children": []
-
                 }
 
                 founder = self.lineage_stats[b.id]["founder"]
@@ -472,12 +437,7 @@ class TBWorld:
                     "birth_tick": self.tick
                 }
 
-
-                self.lineages[b.id]["children"].append(
-
-                    child.id
-
-                )
+                self.lineages[b.id]["children"].append(child.id)
 
 
         self.bacteria.extend(newborns)
@@ -521,9 +481,16 @@ class TBWorld:
                         config=self.config
                     )
 
+                    child.generation = 1
+                    child.parent_id = -1
+
                     child.energy = 40
                     child.metabolism.atp = 0.4
                     child.state = Bacteria.STRESSED
+
+                    child.generation = 0
+                    child.parent_id = None
+                    child.founder_id = child.id
 
                     self.lineages[child.id] = {
                         "parent": None,
@@ -536,6 +503,8 @@ class TBWorld:
                     }
 
                     new_bacteria.append(child)
+
+                    self.total_births += 1
 
                 m.intracellular_tb = 0
 
@@ -606,9 +575,17 @@ class TBWorld:
 
         ]
 
+        assert self.successful_births <= self.total_births, (
+            f"Counter error: successful_births={self.successful_births}, "
+            f"total_births={self.total_births}"
+        )
+
+        self.compute_debug_stats()
+
         if self.tick % 100 == 0:
 
             self.report_cytokines()
+            self.report_reproduction()
             self.report_oxygen()
             self.report_grn()
             self.report_observables()
@@ -638,6 +615,9 @@ class TBWorld:
                 f"DORMANT:{dormant} "
                 f"STRESSED:{stressed}"
             )
+
+            print(f"Reproduction Attempts : {self.reproduction_attempts}")
+            print(f"Successful Births     : {self.successful_births}")
 
             inside = 0
 
@@ -718,7 +698,21 @@ class TBWorld:
 
                 self.debug_stats["max_generation"],
 
-                self.debug_stats["living_lineages"]
+                self.debug_stats["living_lineages"],
+
+                self.debug_stats["pareto_fronts"],
+
+                self.debug_stats["best_front_size"],
+
+                self.debug_stats["average_pareto_rank"],
+
+                self.debug_stats["reproduction_attempts"],
+
+                self.debug_stats["successful_births"],
+
+                self.debug_stats["births"],
+
+                self.debug_stats["deaths"],
 
             ])
 
@@ -864,8 +858,6 @@ class TBWorld:
 
         self.camera.update()
 
-        self.compute_debug_stats()
-
     def report_cytokines(self):
         print(
 
@@ -919,6 +911,129 @@ class TBWorld:
                 )
             )
 
+    def report_reproduction(self):
+
+        print("\n========== REPRODUCTION ==========\n")
+
+        print(
+            f"Attempts            : "
+            f"{self.reproduction_attempts}"
+        )
+
+        print(
+            f"State Rejected      : "
+            f"{self.repro_fail_state}"
+        )
+
+        print(
+            f"Health Rejected     : "
+            f"{self.repro_fail_health}"
+        )
+
+        print(
+            f"Probability Rejected: "
+            f"{self.repro_fail_probability}"
+        )
+
+        print(
+            f"Successful Births   : "
+            f"{self.successful_births}"
+        )
+
+        success_rate = (
+            100.0
+            * self.successful_births
+            / max(1, self.reproduction_attempts)
+        )
+
+        active = sum(
+            1 for b in self.bacteria
+            if b.state == Bacteria.ACTIVE
+        )   
+  
+        reactivating = sum(
+            1 for b in self.bacteria
+            if b.state == Bacteria.REACTIVATING
+        )
+
+        avg_growth = (
+            sum(
+                b.grn.current_phenotype["growth_factor"]
+                for b in self.bacteria
+            )
+            / max(1, len(self.bacteria))
+        )
+
+        avg_energy = (
+            sum(b.energy for b in self.bacteria)
+            / max(1, len(self.bacteria))
+        )
+
+        print(
+            f"Average Energy      : "
+            f"{avg_energy:.2f}"
+        )
+
+        avg_atp = (
+            sum(
+                b.metabolism.atp
+                for b in self.bacteria
+            )
+            / max(1, len(self.bacteria))
+        )
+
+        print(
+            f"Average ATP         : "
+            f"{avg_atp:.3f}"
+        )
+
+        print(
+            f"Average Growth      : "
+            f"{avg_growth:.3f}"
+        )
+
+        print(
+            f"Eligible to Reproduce : "
+            f"{active + reactivating}"
+        )
+
+        dormant = sum(
+            1 for b in self.bacteria
+            if b.state == Bacteria.DORMANT
+        )
+
+        stressed = sum(
+            1 for b in self.bacteria
+            if b.state == Bacteria.STRESSED
+        )
+
+        print(
+            f"Dormant + Stressed  : "
+            f"{dormant + stressed}"
+        )
+
+        average_probability = (
+            self.reproduction_probability_sum
+            / max(1, self.reproduction_attempts)
+        )
+
+        print(
+            f"Average Probability : "
+            f"{average_probability:.5f}"
+        )
+
+        print(
+            f"Success Rate        : "
+            f"{success_rate:.2f}%"
+        )
+
+        print("\n==================================")
+
+        self.reproduction_attempts = 0
+        self.repro_fail_state = 0
+        self.repro_fail_health = 0
+        self.repro_fail_probability = 0
+        self.reproduction_probability_sum = 0.0
 
     def report_oxygen(self):
         print(
@@ -1299,36 +1414,22 @@ class TBWorld:
 
             ParetoOptimizer.crowding_distance(front)
 
-        self.speciation.clear()
-
-        for bacterium in alive:
-
-            cppn = bacterium.genome.get("cppn")
-
-            if cppn:
-
-                bacterium.species = self.speciation.assign(cppn)
-
         species_count = len(self.speciation.species)
 
         largest_species = max(
-
-            (len(s.members) for s in self.speciation.species),
-
+            (
+                len(s.members)
+                for s in self.speciation.species
+            ),
             default=0
-
         )
 
         average_species_size = (
-
-            sum(len(s.members) for s in self.speciation.species)
-
-            / species_count
-
-            if species_count
-
-            else 0
-
+            sum(
+                len(s.members)
+                for s in self.speciation.species
+            )
+            / max(1, species_count)
         )
 
         cppn_fitness = []
@@ -1560,9 +1661,9 @@ class TBWorld:
 
             "hypoxic_bacteria": hypoxic,
 
-            "births": 0,
+            "births": self.total_births,
 
-            "deaths": 0,
+            "deaths": self.total_deaths,
 
             "avg_energy":
                 sum(b.energy for b in alive) / N,
@@ -1793,6 +1894,12 @@ class TBWorld:
             "novelty_archive_size":
 
                 len(novelty_archive.archive),
+
+            "reproduction_attempts":
+                self.reproduction_attempts,
+
+            "successful_births":
+                self.successful_births,
 
         }
 
