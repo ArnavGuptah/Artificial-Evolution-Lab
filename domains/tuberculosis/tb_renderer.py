@@ -451,6 +451,12 @@ class TBRenderer:
 
             (f"Speed : {simulation_speed}x", (0,255,255)),
 
+            (f"Repro Attempts : {debug_stats['reproduction_attempts']}",(180, 180, 255)),
+
+            (f"Successful Births : {debug_stats['successful_births']}",(120, 255, 120)),
+
+            (f"Total Births : {debug_stats['births']}",(255, 220, 120)),
+
         ]
 
         x = WORLD_WIDTH - 285

@@ -5,5 +5,12 @@
 
     "environment": {
         "oxygen_diffusion": 0.45
+    },
+
+    "qml": {
+        "enabled": true,
+        "fitness_bonus": 0.05,
+        "minimum_samples": 100,
+        "auto_train": true
     }
 }

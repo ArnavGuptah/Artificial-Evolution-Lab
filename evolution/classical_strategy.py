@@ -1,12 +1,12 @@
 from evolution.strategy import EvolutionStrategy
-
+from evolution.selection import Selection
 
 class ClassicalStrategy(EvolutionStrategy):
 
     def evolve(self, world):
-        """
-        Classical evolution.
+        
+        world.perform_reproduction()
 
-        Temporary implementation.
-        """
-        pass
+        world.perform_selection()
+
+        world.perform_speciation()

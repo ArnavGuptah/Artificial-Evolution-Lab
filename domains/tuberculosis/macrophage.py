@@ -34,7 +34,6 @@ class Macrophage:
 
         angle = random.uniform(0, 2*math.pi)
 
-
         self.x += 0.5 * math.cos(angle)
 
         self.y += 0.5 * math.sin(angle)

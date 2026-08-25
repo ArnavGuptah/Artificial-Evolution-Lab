@@ -92,6 +92,10 @@ class Bacteria(Agent):
 
         self.generation = 0
 
+        self.quantum_prediction = None
+
+        self.quantum_bonus = 0.0
+
         self.parent_id = None
 
         self.children = []
@@ -285,10 +289,17 @@ class Bacteria(Agent):
 
         )
 
-        world.mutation_strategy.mutate_cppn(
-            child_genome["cppn"],
-            world.speciation
+        stress = (
+
+            0.4 * self.grn.inputs["drug"]
+            +
+            0.3 * self.grn.inputs["immune"]
+            +
+            0.3 * (1 - self.grn.inputs["oxygen"])
+
         )
+
+        world.mutation_strategy.mutate_cppn(child_genome["cppn"], world.speciation, stress, self)
 
         decoder = HyperNEATDecoder(
 
@@ -373,6 +384,22 @@ class Bacteria(Agent):
 
         return child
 
+    def quantum_features(self):
+
+        return [
+            self.metabolism.atp,
+            self.grn.functions["growth"],
+            self.grn.regulators["dosR"],
+            self.grn.regulators["sigH"],
+            self.metabolism.oxygen,
+            self.metabolism.cell_health,
+            self.energy,
+            self.fitness
+        ]
+
+    def update_quantum_prediction(self, world):
+
+        self.quantum_prediction = world.predict_bacterium(self)
 
     def update(self, oxygen_field, treatment, macrophages, immune_cells):
 

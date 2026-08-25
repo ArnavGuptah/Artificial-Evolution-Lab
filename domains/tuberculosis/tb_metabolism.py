@@ -56,8 +56,6 @@ class TBMetabolism:
 
         self.atp = max(0.05, min(1.0, self.atp))
 
-        self.atp = max(0.0, min(1.0, self.atp))
-
         if inputs["oxygen"] < 0.30:
 
             print(

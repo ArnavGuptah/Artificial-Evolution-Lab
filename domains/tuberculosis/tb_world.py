@@ -24,16 +24,26 @@ from engine.novelty import novelty_archive
 import time
 from evolution.classical_strategy import ClassicalStrategy
 from evolution.gaussian_mutation import GaussianMutationStrategy
+from domains.tuberculosis.treatment_scheduler import TreatmentScheduler
+from evolution.pipeline import EvolutionPipeline
+from evolution.classical_strategy import ClassicalStrategy
+from evolution.selection import Selection
+from qml.inference import QuantumInference
+
 
 class TBWorld:
 
-    def __init__(self, config, manager):
+    def __init__(self, config, manager, backend="qsvm"):
 
         super().__init__()
 
         self.mutation_strategy = GaussianMutationStrategy()
 
         self.evolution = ClassicalStrategy()
+
+        self.treatment_scheduler = TreatmentScheduler()
+
+        self.backend = backend
 
         self.config = config
 
@@ -71,14 +81,8 @@ class TBWorld:
 
         self.csv_file = open(
 
-            self.manager.path(
-
-                "transition_log.csv"
-
-            ),
-
+            self.manager.path("transition_log.csv"),
             "w",
-
             newline=""
 
         )
@@ -125,20 +129,25 @@ class TBWorld:
         self.metabolism = TBMetabolism()
 
         self.treatment = {
-
             "INH": self.config["treatment"]["INH"],
-
             "RIF": self.config["treatment"]["RIF"],
-
             "PZA": self.config["treatment"]["PZA"],
-
             "EMB": self.config["treatment"]["EMB"]
-
         }
 
         self.experiment = self.config["experiment"]["name"]
 
         self.analytics = TBAnalytics()
+
+        self.quantum = QuantumInference(backend=self.backend)
+
+        if self.config["qml"]["enabled"]:
+
+            print("QML guidance: ENABLED")
+
+        else:
+
+            print("QML guidance: DISABLED")
 
         self.validator = TBValidator()
 
@@ -298,9 +307,13 @@ class TBWorld:
                 )
             )
 
+        self.evolution = EvolutionPipeline(ClassicalStrategy())
+
     def update(self):
 
         self.tick += 1
+
+        self.treatment = self.treatment_scheduler.current(self.tick)
 
         self.update_environment()
 
@@ -368,21 +381,6 @@ class TBWorld:
 
                     break
 
-        #if self.tick == 2000:
-#
- #           self.treatment["INH"] = True
-  #          self.treatment["RIF"] = True
-   #         self.treatment["PZA"] = True
-    #        self.treatment["EMB"] = True
-
-
-     #   if self.tick == 5000:
-
-#            self.treatment["INH"] = False
- #           self.treatment["RIF"] = False
-  #          self.treatment["PZA"] = False
-   #         self.treatment["EMB"] = False
-
         newborns = []
         births = 0
 
@@ -409,38 +407,7 @@ class TBWorld:
 
                 continue
 
-            self.reproduction_attempts += 1
-
-            child = b.reproduce(self)
-
-            if child is not None:
-
-                print(f"[BIRTH SUCCESS] tick={self.tick} parent={b.id} child={child.id}")
-
-                self.successful_births += 1
-                self.total_births += 1
-
-                newborns.append(child)
-
-                births += 1
-                reproduction_added += 1
-
-                self.lineages[child.id] = {
-                    "parent": b.id,
-                    "children": []
-                }
-
-                founder = self.lineage_stats[b.id]["founder"]
-
-                self.lineage_stats[child.id] = {
-                    "founder": founder,
-                    "birth_tick": self.tick
-                }
-
-                self.lineages[b.id]["children"].append(child.id)
-
-
-        self.bacteria.extend(newborns)
+        self.perform_reproduction()
 
         if self.tick % 10 == 0:
 
@@ -452,62 +419,7 @@ class TBWorld:
 
             }
 
-        new_bacteria = []
-
-        for m in self.macrophages:
-
-            if m.state == Macrophage.INFECTED:
-
-                self.cytokines.deposit(m.x, m.y, amount=0.6)
-
-            burst = m.update(self.bacteria)
-
-            if burst:
-
-                released = int(m.intracellular_tb)
-
-                print(
-                    f"Macrophage burst -> {released} TB released"
-                )
-
-                for _ in range(released):
-
-                    angle = random.uniform(0, 2 * math.pi)
-                    radius = random.uniform(5, 40)
-
-                    child = Bacteria(
-                        m.x + radius * math.cos(angle),
-                        m.y + radius * math.sin(angle),
-                        config=self.config
-                    )
-
-                    child.generation = 1
-                    child.parent_id = -1
-
-                    child.energy = 40
-                    child.metabolism.atp = 0.4
-                    child.state = Bacteria.STRESSED
-
-                    child.generation = 0
-                    child.parent_id = None
-                    child.founder_id = child.id
-
-                    self.lineages[child.id] = {
-                        "parent": None,
-                        "children": []
-                    }
-
-                    self.lineage_stats[child.id] = {
-                        "founder": child.id,
-                        "birth_tick": self.tick
-                    }
-
-                    new_bacteria.append(child)
-
-                    self.total_births += 1
-
-                m.intracellular_tb = 0
-
+        macrophage_added = self.update_macrophages()
 
         # Recruit new macrophages based on inflammation
         if self.tick % 300 == 0:
@@ -530,25 +442,13 @@ class TBWorld:
 
                 print("New macrophage recruited")
 
-        MAX_BACTERIA = 2000
+        self.perform_selection()
 
-        self.bacteria.extend(new_bacteria)
-
-        if len(self.bacteria) > MAX_BACTERIA:
-
-            from evolution.selection import Selection
-
-            self.bacteria = Selection.sort(self.bacteria)
-
-            self.bacteria = self.bacteria[:MAX_BACTERIA]
-
-        macrophage_added = len(new_bacteria)
-
-        if len(new_bacteria) > 0:
+        if macrophage_added > 0:
 
             print(
                 f"Macrophages added "
-                f"{len(new_bacteria)} bacteria"
+                f"{macrophage_added} bacteria"
             )
 
         alive = []
@@ -584,141 +484,7 @@ class TBWorld:
 
         if self.tick % 100 == 0:
 
-            self.report_cytokines()
-            self.report_reproduction()
-            self.report_oxygen()
-            self.report_grn()
-            self.report_observables()
-            self.report_phenotype()
-            self.report_validation()
-            self.report_evolution()
-            self.report_fitness()
-            self.report_state_scores()
-
-            active = sum(
-                1 for b in self.bacteria
-                if b.state == Bacteria.ACTIVE
-            )
-
-            dormant = sum(
-                1 for b in self.bacteria
-                if b.state == Bacteria.DORMANT
-            )
-
-            stressed = sum(
-                1 for b in self.bacteria
-                if b.state == Bacteria.STRESSED
-            )
-
-            print(
-                f"ACTIVE:{active} "
-                f"DORMANT:{dormant} "
-                f"STRESSED:{stressed}"
-            )
-
-            print(f"Reproduction Attempts : {self.reproduction_attempts}")
-            print(f"Successful Births     : {self.successful_births}")
-
-            inside = 0
-
-            for b in self.bacteria:    
-                
-                d = math.hypot(
-                    b.x - self.granulomas[0].x,
-                    b.y - self.granulomas[0].y
-                )
-
-                if d < self.granulomas[0].radius:
-                    inside += 1
-
-            if self.bacteria:
-
-                for regulator in self.grn_history:
-
-                    avg = sum(
-
-                        b.grn.regulators[regulator]
-
-                        for b in self.bacteria
-
-                    ) / len(self.bacteria)
-
-                    self.grn_history[regulator].append(avg)
-
-            for gene in [
-
-                "dosR",
-                "sigH",
-                "sigE",
-                "mprA",
-                "phoP",
-                "whiB3"
-
-            ]:
-
-                if self.debug_stats[f"{gene}_std"] < 0.02:
-
-                    print(
-
-                        f"[WARNING] {gene} appears frozen."
-
-                    )
-
-            self.csv_writer.writerow([
-
-                self.tick,
-
-                self.debug_stats["population"],
-
-                self.debug_stats["active_percent"],
-
-                self.debug_stats["dormant_percent"],
-
-                self.debug_stats["stressed_percent"],
-
-                self.debug_stats["average_fitness"],
-
-                self.validator.latest(self.observables.history, 'average_atp'),
-
-                self.validator.latest(self.observables.history, 'average_growth'),
-
-                self.validator.latest(self.observables.history,'average_dosR'),
-
-                self.debug_stats["average_cppn_fitness"],
-
-                self.debug_stats["best_cppn_fitness"],
-
-                self.debug_stats["average_grn_weight"],
-
-                self.debug_stats["species_count"],
-
-                self.debug_stats["largest_species"],
-
-                self.debug_stats["average_species_size"],
-
-                self.debug_stats["max_generation"],
-
-                self.debug_stats["living_lineages"],
-
-                self.debug_stats["pareto_fronts"],
-
-                self.debug_stats["best_front_size"],
-
-                self.debug_stats["average_pareto_rank"],
-
-                self.debug_stats["reproduction_attempts"],
-
-                self.debug_stats["successful_births"],
-
-                self.debug_stats["births"],
-
-                self.debug_stats["deaths"],
-
-            ])
-
-            self.csv_file.flush()
-
-            self.analytics.record(self)
+            self.perform_reporting()
 
             if self.debug_stats["population"] > 5000:
                 print("[WARNING] Population explosion.")
@@ -910,6 +676,30 @@ class TBWorld:
                     2
                 )
             )
+
+    def report_lineaages(self):
+
+        largest_family = max(
+            (len(b.children) for b in self.bacteria),
+            default=0
+        )
+
+        oldest_generation = max(
+            (b.generation for b in self.bacteria),
+            default=0
+        )
+
+        living_lineages = len({
+            self.lineage_stats[b.id]["founder"]
+            for b in self.bacteria
+            if b.id in self.lineage_stats
+        })
+
+        print("\n========== LINEAGES ==========")
+        print(f"Living Lineages : {living_lineages}")
+        print(f"Oldest Generation : {oldest_generation}")
+        print(f"Largest Family : {largest_family}")
+        print("==============================")
 
     def report_reproduction(self):
 
@@ -1400,6 +1190,32 @@ class TBWorld:
 
         print("======================================")
 
+    def report_resistance(self):
+
+        print("\n========== DRUG RESISTANCE ==========\n")
+
+        print(
+            f"INH : "
+            f"{self.debug_stats['avg_inh_resistance']:.3f}"
+        )
+
+        print(
+            f"RIF : "
+            f"{self.debug_stats['avg_rif_resistance']:.3f}"
+        )
+
+        print(
+            f"FQ  : "
+            f"{self.debug_stats['avg_fq_resistance']:.3f}"
+        )
+
+        print(
+            f"INJ : "
+            f"{self.debug_stats['avg_injectable_resistance']:.3f}"
+        )
+
+        print("\n====================================")
+
     def compute_debug_stats(self):
 
         alive = [b for b in self.bacteria if b.state != Bacteria.DEAD]
@@ -1745,6 +1561,39 @@ class TBWorld:
                     b.genome["dormancy_tendency"]
                     for b in alive
                 ) / N,
+
+            "avg_dormancy_gene":
+                sum(
+                    b.genome["dormancy_tendency"]
+                    for b in alive
+                ) / N,
+
+            "avg_inh_resistance":
+                sum(
+                    b.genome["inh_resistance"]
+                    for b in alive
+                ) / N,
+
+            "avg_rif_resistance":
+                sum(
+                    b.genome["rif_resistance"]
+                    for b in alive
+                ) / N,
+
+            "avg_fq_resistance":
+                sum(
+                    b.genome["fluoroquinolone_resistance"]
+                    for b in alive
+                ) / N,
+
+            "avg_injectable_resistance":
+                sum(
+                    b.genome["injectable_resistance"]
+                    for b in alive
+                ) / N,
+
+            "oxygen_min":
+                float(self.oxygen.grid.min()),
 
             "oxygen_min":
                 float(self.oxygen.grid.min()),
@@ -2115,6 +1964,30 @@ class TBWorld:
 
         self.validate()
 
+        from qml.train_qsvm import QSVMTrainer
+
+        if (self.config["qml"]["auto_train"]
+            and
+            len(self.analytics.samples) 
+            >=
+            self.config["qml"]["minimum_samples"]
+
+        ):
+
+            print()
+
+            print("========== TRAINING QSVM ==========")
+
+            trainer = QSVMTrainer(self.analytics.samples)
+
+            trainer.train()
+
+        else:
+
+            print()
+
+            print("Not enough samples to train QSVM.")
+
         self.csv_file.close()
 
         pygame.quit()
@@ -2426,3 +2299,270 @@ class TBWorld:
             print("✓ Population remained viable.")
 
         print("===========================================\n")
+
+    def perform_reproduction(self):
+
+        newborns = []
+
+        births = 0
+
+        reproduction_added = 0
+
+        for b in self.bacteria[:]:
+
+            if b.state == Bacteria.DEAD:
+                continue
+
+            self.reproduction_attempts += 1
+
+            child = b.reproduce(self)
+
+            if child is not None:
+
+                print(
+                    f"[BIRTH SUCCESS] "
+                    f"tick={self.tick} "
+                    f"parent={b.id} "
+                    f"child={child.id}"
+                )
+
+                self.successful_births += 1
+                self.total_births += 1
+
+                newborns.append(child)
+
+                births += 1
+                reproduction_added += 1
+
+                self.lineages[child.id] = {
+                    "parent": b.id,
+                    "children": []
+                }
+
+                founder = self.lineage_stats[b.id]["founder"]
+
+                self.lineage_stats[child.id] = {
+                    "founder": founder,
+                    "birth_tick": self.tick
+                }
+
+                self.lineages[b.id]["children"].append(child.id)
+
+        self.bacteria.extend(newborns)
+
+    def perform_selection(self):
+
+        MAX_BACTERIA = self.config["population"]["max_bacteria"]
+
+        self.bacteria = Selection.sort(self.bacteria)
+
+        if (self.config["qml"]["enabled"] and self.quantum.available()):
+
+            X_train, _ = self.analytics.dataset()
+
+            if len(X_train) > 0:
+
+                for bacterium in self.bacteria:
+
+                    prediction = self.predict_bacterium(bacterium)
+
+                    bacterium.quantum_prediction = prediction
+
+                    if prediction is not None:
+
+                        confidence = max(prediction)
+
+                        bonus = (self.config["qml"]["fitness_bonus"] * confidence)
+
+                        bacterium.quantum_bonus = bonus
+
+                        bacterium.fitness += bonus
+
+        if len(self.bacteria) > MAX_BACTERIA:
+
+            self.bacteria = self.bacteria[:MAX_BACTERIA]
+
+    def update_macrophages(self):
+
+        new_bacteria = []
+
+        for m in self.macrophages:
+
+            if m.state == Macrophage.INFECTED:
+
+                self.cytokines.deposit(m.x, m.y, amount=0.6)
+
+            burst = m.update(self.bacteria)
+
+            if burst:
+
+                released = int(m.intracellular_tb)
+
+                print(
+                    f"Macrophage burst -> {released} TB released"
+                )
+
+                for _ in range(released):
+
+                    angle = random.uniform(0, 2 * math.pi)
+                    radius = random.uniform(5, 40)
+
+                    child = Bacteria(
+                        m.x + radius * math.cos(angle),
+                        m.y + radius * math.sin(angle),
+                        config=self.config
+                    )
+
+                    child.generation = 0
+                    child.parent_id = None
+                    child.founder_id = child.id
+
+                    child.energy = 40
+                    child.metabolism.atp = 0.4
+                    child.state = Bacteria.STRESSED
+
+                    self.lineages[child.id] = {
+                        "parent": None,
+                        "children": []
+                    }
+
+                    self.lineage_stats[child.id] = {
+                        "founder": child.id,
+                        "birth_tick": self.tick
+                    }
+
+                    new_bacteria.append(child)
+
+                    self.total_births += 1
+
+                m.intracellular_tb = 0
+
+        self.bacteria.extend(new_bacteria)
+
+        return len(new_bacteria)
+
+    def perform_reporting(self):
+
+        self.report_cytokines()
+        self.report_lineaages()
+        self.report_reproduction()
+        self.report_oxygen()
+        self.report_grn()
+        self.report_observables()
+        self.report_phenotype()
+        self.report_validation()
+        self.report_evolution()
+        self.report_fitness()
+        self.report_state_scores()
+        self.report_resistance()
+
+        active = sum(
+            1 for b in self.bacteria
+            if b.state == Bacteria.ACTIVE
+        )
+
+        dormant = sum(
+            1 for b in self.bacteria
+            if b.state == Bacteria.DORMANT
+        )
+
+        stressed = sum(
+            1 for b in self.bacteria
+            if b.state == Bacteria.STRESSED
+        )
+
+        print(
+            f"ACTIVE:{active} "
+            f"DORMANT:{dormant} "
+            f"STRESSED:{stressed}"
+        )
+
+        print("\n===== TREATMENT =====")
+
+        for drug, state in self.treatment.items():
+
+            print(
+                f"{drug:4s} : {'ON' if state else 'OFF'}"
+            )
+
+        print("=====================\n")
+
+        print(f"Reproduction Attempts : {self.reproduction_attempts}")
+        print(f"Successful Births     : {self.successful_births}")
+
+        inside = 0
+
+        for b in self.bacteria:
+
+            d = math.hypot(
+                b.x - self.granulomas[0].x,
+                b.y - self.granulomas[0].y
+            )
+
+            if d < self.granulomas[0].radius:
+                inside += 1
+
+        if self.bacteria:
+
+            for regulator in self.grn_history:
+
+                avg = sum(
+                    b.grn.regulators[regulator]
+                    for b in self.bacteria
+                ) / len(self.bacteria)
+
+                self.grn_history[regulator].append(avg)
+
+        for gene in [
+            "dosR",
+            "sigH",
+            "sigE",
+            "mprA",
+            "phoP",
+            "whiB3"
+        ]:
+
+            if self.debug_stats[f"{gene}_std"] < 0.02:
+
+                print(f"[WARNING] {gene} appears frozen.")
+
+        self.csv_writer.writerow([
+            self.tick,
+            self.debug_stats["population"],
+            self.debug_stats["active_percent"],
+            self.debug_stats["dormant_percent"],
+            self.debug_stats["stressed_percent"],
+            self.debug_stats["average_fitness"],
+            self.validator.latest(self.observables.history, 'average_atp'),
+            self.validator.latest(self.observables.history, 'average_growth'),
+            self.validator.latest(self.observables.history, 'average_dosR'),
+            self.debug_stats["average_cppn_fitness"],
+            self.debug_stats["best_cppn_fitness"],
+            self.debug_stats["average_grn_weight"],
+            self.debug_stats["species_count"],
+            self.debug_stats["largest_species"],
+            self.debug_stats["average_species_size"],
+            self.debug_stats["max_generation"],
+            self.debug_stats["living_lineages"],
+            self.debug_stats["pareto_fronts"],
+            self.debug_stats["best_front_size"],
+            self.debug_stats["average_pareto_rank"],
+            self.debug_stats["reproduction_attempts"],
+            self.debug_stats["successful_births"],
+            self.debug_stats["births"],
+            self.debug_stats["deaths"],
+        ])
+
+        self.csv_file.flush()
+
+        self.analytics.record(self)
+
+    def predict_bacterium(self, bacterium):
+
+        if not self.quantum.available():
+
+            return None
+
+        features = bacterium.quantum_features()
+
+        return self.quantum.predict(features, self.analytics.dataset()[0])

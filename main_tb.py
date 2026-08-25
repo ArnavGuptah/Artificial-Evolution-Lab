@@ -2,15 +2,29 @@ import sys
 from configs.config_loader import ConfigLoader
 from core.experiment.experiment_manager import ExperimentManager
 from domains.tuberculosis.tb_world import TBWorld
+import argparse
 
 
 def main():
 
-    mode = "baseline"
+    parser = argparse.ArgumentParser()
 
-    if len(sys.argv) > 1:
+    parser.add_argument(
+        "experiment",
+        nargs="?",
+        default="baseline"
+    )
 
-        mode = sys.argv[1]
+    parser.add_argument(
+        "--backend",
+        choices=["qsvm", "vqc"],
+        default="qsvm"
+    )
+
+    args = parser.parse_args()
+
+    mode = args.experiment
+    backend = args.backend
 
     if mode == "all":
 
@@ -31,7 +45,7 @@ def main():
             print(f"\nRunning {experiment}...")
 
             try:
-                run_experiment(experiment)
+                run_experiment(experiment, backend)
                 results[experiment] = "PASS"
                 print(f"✓ {experiment} completed")
 
@@ -55,9 +69,9 @@ def main():
 
         return
 
-    run_experiment(mode)
+    run_experiment(mode, backend)
 
-def run_experiment(config_name):
+def run_experiment(config_name, backend):
 
     config = ConfigLoader(
         "tuberculosis",
@@ -86,7 +100,8 @@ def run_experiment(config_name):
 
         world = TBWorld(
             config,
-            manager
+            manager,
+            backend=backend
         )
 
         world.run()

@@ -177,10 +177,7 @@ class TBGRN:
 
         self.current_phenotype = {
 
-            "growth_factor":
-
-                0.6 * self.functions["growth"]
-                + 0.4 * metabolism.atp,
+            "growth_factor": self.functions["growth"],
 
             "stress_tolerance":
 
@@ -218,16 +215,16 @@ class TBGRN:
 
         scores["ACTIVE"] = (
 
-            0.60 * p["growth_factor"]
-            + 0.25 * self.inputs["oxygen"]
+            0.50 * p["growth_factor"]
+            + 0.35 * self.inputs["oxygen"]
             + 0.15 * self.inputs["nutrient"]
 
         )
 
         scores["DORMANT"] = (
 
-            0.55 * p["dormancy"]
-            + 0.25 * (1 - self.inputs["oxygen"])
+            0.45 * p["dormancy"]
+            + 0.35 * (1 - self.inputs["oxygen"])
             + 0.20 * p["persistence"]
 
         )
@@ -257,9 +254,7 @@ class TBGRN:
         ordered = sorted(
 
             scores.items(),
-
             key=lambda x: x[1],
-
             reverse=True
 
         )
@@ -286,16 +281,16 @@ class TBGRN:
                 best_state = "DORMANT"
 
             elif (
-                self.inputs["oxygen"] > 0.70
+                self.inputs["oxygen"] > 0.60
                 and
-                metabolism.atp > 0.40
+                metabolism.atp > 0.25
             ):
 
                 best_state = "REACTIVATING"
 
-        self.last_scores = scores
-
         self.last_state = best_state
+
+        self.last_scores = scores.copy()
 
         return best_state
         
@@ -377,8 +372,8 @@ class TBGRN:
         )
 
         energy_factor = (
-            0.2 * self.physiology["energy"]
-            + 0.8 * self.inputs["oxygen"]
+            0.5 * self.physiology["energy"]
+            + 0.5 * self.inputs["oxygen"]
         )
 
         f["growth"] = (

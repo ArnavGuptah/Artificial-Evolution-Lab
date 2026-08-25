@@ -1,5 +1,6 @@
 import random
-
+from qml.biological_filter import BiologicalFilter
+from qml.tasks import PredictionTask
 
 class QuantumDataset:
 
@@ -11,7 +12,9 @@ class QuantumDataset:
 
         self.y = []
 
-    def build(self):
+        self.filter = BiologicalFilter()
+
+    def build(self, task=PredictionTask.STATE):
 
         self.X = []
 
@@ -19,20 +22,9 @@ class QuantumDataset:
 
         for sample in self.samples:
 
-            features = [
+            filtered = self.filter.select(sample, task)
 
-                sample["atp"],
-                sample["growth"],
-                sample["dosR"],
-                sample["sigH"],
-                sample["sigE"],
-                sample["redox"],
-                sample["health"],
-                sample["oxygen"],
-                sample["energy"],
-                sample["fitness"]
-
-            ]
+            features = list(filtered.values())
 
             self.X.append(features)
 

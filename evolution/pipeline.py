@@ -1,10 +1,11 @@
-from abc import ABC, abstractmethod
-
-class EvolutionPipeline(ABC):
+class EvolutionPipeline:
     #Coordinates one evolutionary step.
     #Biology stays outside this class.
 
-    @abstractmethod
+    def __init__(self, strategy):
+
+        self.strategy = strategy
+    
     def evolve(self, world):
-        #Perform one evolutionary cycle.
-        pass
+        
+        self.strategy.evolve(world)

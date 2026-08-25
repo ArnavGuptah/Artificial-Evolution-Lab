@@ -6,5 +6,12 @@
     "population": {
         "initial_macrophages": 100,
         "initial_immune": 60
+    },
+
+    "qml": {
+        "enabled": true,
+        "fitness_bonus": 0.05,
+        "minimum_samples": 100,
+        "auto_train": true
     }
 }

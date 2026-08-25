@@ -126,6 +126,15 @@ class TBObservables:
 
         # ---------------- Metabolism ----------------
 
+        avg_atp = sum(b.metabolism.atp for b in bacteria) / N
+
+        print(f"[DEBUG] Tick={world.tick}")
+        print(f"[DEBUG] N={N}")
+        print(f"[DEBUG] ATPs={[round(b.metabolism.atp, 3) for b in bacteria[:10]]}")
+        print(f"[DEBUG] Average ATP={avg_atp:.3f}")
+
+        self.history["average_atp"].append(avg_atp)
+
         self.history["average_atp"].append(
 
             sum(
